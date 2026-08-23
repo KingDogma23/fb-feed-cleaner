@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FB Feed Cleaner — detection test</title>
+    <link rel="stylesheet" href="../content.css" />
+    <style>
+      body { font: 14px system-ui; background: #f0f2f5; margin: 0; padding: 20px; }
+      #results { position: fixed; top: 0; right: 0; width: 340px; height: 100vh;
+                 overflow: auto; background: #fff; border-left: 1px solid #ccc;
+                 padding: 12px; font: 12px/1.5 ui-monospace, monospace; }
+      #feed { width: 500px; }
+      .post { background: #fff; border-radius: 8px; margin-bottom: 16px; padding: 12px; }
+      .hdr { display: flex; gap: 8px; align-items: center; height: 40px; }
+      .avatar { width: 40px; height: 40px; border-radius: 50%; background: #ccc; }
+      .name { font-weight: 600; }
+      .lnk { color: #1877f2; cursor: pointer; }
+      .body { margin-top: 10px; }
+      .pill { margin-left: auto; background: #e4e6eb; border-radius: 6px;
+              padding: 6px 12px; font-weight: 600; }
+      .banner { color: #65676b; font-size: 12px; margin-bottom: 6px; }
+      .pass { color: #0a7c2f; } .fail { color: #c00; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <!-- No role="feed" and no role="main" landmark on the feed container, and
+         cases 9/10 carry no role="article" either — this is what the live page
+         actually looks like, and it is why finding posts by landmark failed. -->
+    <div role="main">
+    <div id="feed">
+      <!-- 1: classic suggested post — inline "· Follow" link in the header -->
+      <div>
+        <div class="post" role="article" data-case="1" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name"><a role="link" href="#">Cat Memes Daily</a></span>
+              <span> · </span><span><a role="link" href="#" class="lnk">Follow</a></span>
+              <div style="font-size:12px;color:#65676b">2h · Public</div>
+            </div>
+          </div>
+          <div class="body">A cat did a thing. You will not believe what happened next.</div>
+        </div>
+      </div>
+
+      <!-- 2: real friend post whose BODY contains the word Follow -->
+      <div>
+        <div class="post" role="article" data-case="2" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name"><a role="link" href="#">Jane Smith</a></span>
+              <div style="font-size:12px;color:#65676b">4h · Friends</div>
+            </div>
+          </div>
+          <div class="body">
+            New blog is live. To get updates just click here:
+            <span><a role="link" href="#" class="lnk">Follow</a></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3: friend post with a nested comment article containing Follow -->
+      <div>
+        <div class="post" role="article" data-case="3" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name"><a role="link" href="#">Dave Jones</a></span>
+              <div style="font-size:12px;color:#65676b">1d</div>
+            </div>
+          </div>
+          <div class="body">Holiday photos!</div>
+          <div role="article" style="margin-top:10px">
+            <span class="name"><a role="link" href="#">Sue</a></span>
+            <span> · </span><span><a role="link" href="#" class="lnk">Follow</a></span>
+            <div>Nice pics</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4: suggested group — "Join" pill, no Follow -->
+      <div>
+        <div class="post" role="article" data-case="4" data-expect="join-only">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div><span class="name">Vintage Tractor Club</span></div>
+            <div class="pill" role="button" tabindex="0">Join</div>
+          </div>
+          <div class="body">Suggested group with 42k members.</div>
+        </div>
+      </div>
+
+      <!-- 5: suggested post WITH the "Suggested for you" banner (strict mode) -->
+      <div>
+        <div class="post" role="article" data-case="5" data-expect="hide">
+          <div class="banner"><span>Suggested for you</span></div>
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name"><a role="link" href="#">Deals Hub</a></span>
+              <div style="font-size:12px;color:#65676b">Sponsored-ish</div>
+            </div>
+            <div class="pill" role="button" tabindex="0">Follow</div>
+          </div>
+          <div class="body">Buy things.</div>
+        </div>
+      </div>
+
+      <!-- 6: page post you already follow — header says "Following", not "Follow" -->
+      <div>
+        <div class="post" role="article" data-case="6" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name"><a role="link" href="#">Daily Herald</a></span>
+              <span> · </span><span><a role="link" href="#" class="lnk">Following</a></span>
+            </div>
+          </div>
+          <div class="body">Headline of the day.</div>
+        </div>
+      </div>
+
+      <!-- 7: the real Facebook shape, taken from a live feed — a bare
+           <span>Follow</span> with no role, no href and no tabindex, made
+           clickable only by an ancestor's pointer cursor, with the author name
+           inside an <h2>. This is the case v1.0.0 missed. -->
+      <div>
+        <div class="post" role="article" data-case="7" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Old Playhouse Memories</a></span></span>
+                </h2>
+                <span> · </span>
+                <span style="cursor:pointer"><span>Follow</span></span>
+              </span>
+              <div style="font-size:12px;color:#65676b">22 hours ago</div>
+            </div>
+          </div>
+          <div class="body">A couple of photos off the internet.</div>
+        </div>
+      </div>
+      <!-- 9: a feed cell with NO role="article" anywhere. This is what a live
+           feed actually looks like — role="article" matched 2 elements out of
+           dozens of posts, so keying off it alone found almost nothing. -->
+      <div>
+        <div class="post" data-case="9" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Northgate Social Club</a></span></span>
+                </h2>
+                <span> · </span>
+                <span style="cursor:pointer"><span>Follow</span></span>
+              </span>
+              <div style="font-size:12px;color:#65676b">9 August at 08:50</div>
+            </div>
+          </div>
+          <div class="body">Look at this stunning buffet.</div>
+        </div>
+      </div>
+
+      <!-- 10: same shape, but the "Follow" is in the body — the false positive
+           that the article-based comment check used to catch for free. -->
+      <div>
+        <div class="post" data-case="10" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Chris Lundberg</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">19 hours ago</div>
+            </div>
+          </div>
+          <div class="body">
+            So me and my sister-in-law put some flowers up at Dad's bungalow.
+            <span style="cursor:pointer"><span>Follow</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8: an empty skeleton, filled in 2.5s after load — Facebook mounts
+           article shells and hydrates them later. v1.0.2 spent its whole
+           re-check budget on the empty shell and never looked again. -->
+      <div>
+        <div class="post" role="article" data-case="8" data-expect="hide"></div>
+      </div>
+
+      <!-- 11: a sponsored post. "Sponsored" sits in the meta row UNDER the
+           author name, not on the author's line, so it needs its own rule. -->
+      <div>
+        <div class="post" data-case="11" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Streamline AI</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Sponsored</span> <span>&middot;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Create Once. Use Everywhere.</div>
+        </div>
+      </div>
+
+      <!-- 12: the shorter "Ad" variant Facebook also uses. -->
+      <div>
+        <div class="post" data-case="12" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">SteadyNiche</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Ad</span> <span>&middot;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Here's something that might make you uncomfortable.</div>
+        </div>
+      </div>
+
+      <!-- 13: the word is only on an aria-label, never in the text, so the
+           text walk alone would miss it. -->
+      <div>
+        <div class="post" data-case="13" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Zenith Ads</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <a href="#" aria-label="Sponsored"
+                   style="display:inline-block;width:48px;height:12px">&nbsp;</a>
+              </div>
+            </div>
+          </div>
+          <div class="body">Create top-selling ads with AI.</div>
+        </div>
+      </div>
+
+      <!-- 14: a real post that merely says "Sponsored" in its body, well below
+           the header. Must survive. -->
+      <div>
+        <div class="post" data-case="14" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Alex Rivers</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">3 hours ago</div>
+            </div>
+          </div>
+          <div class="body" style="margin-top:220px">
+            <span>Sponsored</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 15: Facebook's obfuscated ad label. The DOM text reads
+           "SxpoQnsorTed"; the decoy letters are hidden three different ways, so
+           only what actually renders spells "Sponsored". -->
+      <div>
+        <div class="post" data-case="15" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Fluxo Boards</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>S</span><span style="display:none">x</span><span>po</span
+                ><span aria-hidden="true">Q</span><span>nsor</span
+                ><span style="font-size:0">T</span><span>ed</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Browser-based eCAD with built-in AI.</div>
+        </div>
+      </div>
+
+      <!-- 16: the inverse. Raw text says "Sponsored" but it is hidden, and what
+           renders is an ordinary timestamp. Must survive, or the reconstruction
+           is just matching raw text with extra steps. -->
+      <div>
+        <div class="post" data-case="16" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Priya Nair</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span style="display:none">Sponsored</span><span>2 hours ago</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Back from holiday.</div>
+        </div>
+      </div>
+
+      <!-- 17: the Stockpile Images shape from a live feed. Label, separator and
+           privacy icon share one run of text: "Ad &middot; &#127760;". Only stripping
+           separators from the START of a label is why this survived v1.2.1. -->
+      <div>
+        <div class="post" data-case="17" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Stockpile Images</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Ad &middot; &#127760;</div>
+            </div>
+          </div>
+          <div class="body">Unlimited Downloads. 83M+ Premium Images.</div>
+        </div>
+      </div>
+
+      <!-- 18: same packing, the "Sponsored" wording. -->
+      <div>
+        <div class="post" data-case="18" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Hopewell Trust</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Sponsored &middot; &#127760;</div>
+            </div>
+          </div>
+          <div class="body">Volunteer with us and help power progress.</div>
+        </div>
+      </div>
+
+      <!-- 19: guard for the segment split. "Ad-hoc" starts with the letters of
+           a label; a hyphen must not be treated as a separator. -->
+      <div>
+        <div class="post" data-case="19" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Sam Okafor</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Ad-hoc meetup &middot; 5h</div>
+            </div>
+          </div>
+          <div class="body">Anyone free Thursday?</div>
+        </div>
+      </div>
+
+      <!-- 20: the shape that defeated v1.2.2. A sponsored post carries the
+           advertiser's name at the top AND again in the call-to-action card at
+           the bottom, so the post contains TWO headings. The old walk stopped
+           on the second heading, landing inside the post on something too
+           narrow to be one, and the ad survived. -->
+      <div>
+        <div class="post" data-case="20" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Veterans Support Trust</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Sponsored &middot; &#127760;</div>
+            </div>
+          </div>
+          <div class="body">They stood for us. Now, we stand for them.</div>
+          <div style="height:220px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+          <!-- the call-to-action card: the advertiser's name a second time -->
+          <div class="hdr" style="margin-top:8px">
+            <h3 style="margin:0;font-size:14px">Veterans Support Trust</h3>
+            <div class="pill" role="button" tabindex="0">Follow</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 21: an ad with NO heading anywhere. The advertiser's name is a plain
+           span. v1.3.0 made ads depend on finding an author heading, which
+           would reject this outright — an assumption never checked against a
+           real feed. Detection must not require a heading to exist. -->
+      <div>
+        <div class="post" data-case="21" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">AdVista Labs</span>
+              <div style="font-size:12px;color:#65676b">Ad &middot; &#127760;</div>
+            </div>
+          </div>
+          <div class="body">Paste your product URL. Get 100s of on-brand ads.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 22: no heading either, and "Sponsored" is in the BODY, far below the
+           header. The geometric fallback must not turn into a blanket match. -->
+      <div>
+        <div class="post" data-case="22" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Dana Silva</span>
+              <div style="font-size:12px;color:#65676b">6h</div>
+            </div>
+          </div>
+          <div class="body" style="margin-top:240px">
+            <span>Sponsored</span> posts are getting out of hand.
+          </div>
+        </div>
+      </div>
+
+      <!-- 23: the gate that was silently dropping ads. A packed run longer than
+           the old 20-character limit was discarded before anything examined it. -->
+      <div>
+        <div class="post" data-case="23" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Lantern Care</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Sponsored &middot; Paid partnership</div>
+            </div>
+          </div>
+          <div class="body">Everyone deserves care and compassion.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 24: obfuscated label AND no plain text anywhere, so only the
+           heading-anchored render sweep can find it. -->
+      <div>
+        <div class="post" data-case="24" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Beacon Health Trust</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Spon</span><span style="display:none">zz</span><span>so</span
+                ><span aria-hidden="true">Q</span><span>red</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Put your pedals to the test.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 25: the combination with no path before v1.4.1 - the label is
+           obfuscated AND the advertiser name is not a heading, so the text walk
+           cannot read it and the heading-anchored sweep never visits it. -->
+      <div>
+        <div class="post" data-case="25" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Wild Places Trust</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Spon</span><span style="display:none">44</span><span>so</span
+                ><span aria-hidden="true">Z</span><span>red</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">There's a pangolin out there who needs your help.</div>
+          <div style="height:220px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 26: the suspected live shape v1.4.5 could not catch. Heavily padded
+           obfuscation: the RAW text is 40+ characters of decoys, the RENDERED
+           text is "Sponsored". The old 32-character raw gate discarded this
+           element before visibleText() ever ran. -->
+      <div>
+        <div class="post" data-case="26" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Willow Hospice</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>S</span><span style="display:none">ab</span><span>p</span
+                ><span style="display:none">cd</span><span>o</span
+                ><span aria-hidden="true">ef</span><span>n</span
+                ><span style="display:none">gh</span><span>s</span
+                ><span style="font-size:0">ij</span><span>o</span
+                ><span style="display:none">kl</span><span>r</span
+                ><span aria-hidden="true">mn</span><span>e</span
+                ><span style="display:none">op</span><span>d</span
+                ><span> &middot; </span><span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">For families facing the unimaginable.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 27: the label mid-run in one flat element: "Name &middot; Sponsored &middot; 4h".
+           Only any-segment matching can catch this; first-segment cannot. -->
+      <div>
+        <div class="post" data-case="27" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Coastal Rescue Trust</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Coastal Rescue Trust &middot; Sponsored &middot; 4h</div>
+            </div>
+          </div>
+          <div class="body">Help keep volunteer crews safe.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 28: the disguise captured from the live feed by v1.4.5's sampler.
+           Each letter is its own span AND carries U+034F (combining grapheme
+           joiner) glued into the text itself. Nothing is hidden by CSS - every
+           span is visible - so visibility-walking finds all of it and the
+           string still never equals "Sponsored" until the invisible
+           codepoints are stripped. -->
+      <div>
+        <div class="post" data-case="28" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Wellness Journey Group</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>S&#847;</span><span>p&#847;</span><span>o&#847;</span
+                ><span>n&#847;</span><span>s&#847;</span><span>o&#847;</span
+                ><span>r&#847;</span><span>e&#847;</span><span>d&#847;</span>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">AnonMember1234 shared this.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 29: zero-width spaces inside a single text node, found by the plain
+           text walk rather than the sweep. Same strip, other path. -->
+      <div>
+        <div class="post" data-case="29" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Redcell Foundation</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">Spon&#8203;so&#8203;red &middot; &#127760;</div>
+            </div>
+          </div>
+          <div class="body">Beating blood cancer is within reach.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 30: the combination that survived on the live feed through v1.4.7.
+           The author is a plain span (no heading), so the heading-anchored
+           sweep never visits; AND the label is per-letter spans with U+034F
+           joiners, so the text walk sees only single letters. Reachable only
+           via the feed-cell fallback, which requires feedCellsFrom to see
+           through the single-child wrapper around every post. -->
+      <div>
+        <div class="post" data-case="30" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Summit Nutrition</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>A&#847;</span><span>d&#847;</span>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Accelerate your recovery with KMC PRO Mix.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 31: the label drawn as SVG text, not HTML text. No heading either.
+           Only an every-element sweep reaches it. -->
+      <div>
+        <div class="post" data-case="31" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Green Fields Alliance</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14" viewBox="0 0 70 14"><text x="0" y="11" font-size="12">Sponsored</text></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Join the movement for better land.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 32: the label carried only by an aria-label on an otherwise empty
+           link - no visible text nodes at all. -->
+      <div>
+        <div class="post" data-case="32" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Access Alliance</span>
+              <div style="font-size:12px;color:#65676b">
+                <a href="#" aria-label="Sponsored"
+                   style="display:inline-block;width:64px;height:12px;background:#eee"></a>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Equal access for everyone.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 33: the live disguise, endgame form. The meta row holds only
+           <svg><use href="#..."/></svg>; the word lives in a document-level
+           sprite sheet, itself joiner-obfuscated. No string in the post, no
+           heading. Only resolving the reference can catch it. -->
+      <div>
+        <div class="post" data-case="33" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Northern Heart Trust</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>&middot;</span>
+                <svg width="70" height="14"><use href="#SvgT901"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Support our work in local communities.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 34: the SAME mechanism carrying a timestamp - what every ordinary
+           group post uses. Resolving must not turn into hiding everything. -->
+      <div>
+        <div class="post" data-case="34" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Riverside Heritage Society</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Jo Marsh</span> <span>&middot;</span>
+                <svg width="24" height="14"><use href="#SvgT902"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Old photos of the high street.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <text id="SvgT901" font-size="12">S&#847;p&#847;o&#847;n&#847;s&#847;o&#847;r&#847;e&#847;d</text>
+        <text id="SvgT902" font-size="12">2&#847;h</text>
+      </defs>
+    </svg>
+
+    <div id="results">loading…</div>
+
+    <script>
+      // Surface any exception thrown by content.js — a silent throw inside the
+      // scan would otherwise just look like "nothing gets hidden".
+      const errors = [];
+      window.addEventListener("error", (e) => errors.push(e.message));
+      const realWarn = console.warn;
+      console.warn = (...a) => { errors.push(a.join(" ")); realWarn(...a); };
+
+      // --- minimal chrome API stub so content.js runs outside an extension ---
+      const store = {};
+      let onChangedCb = null;
+      window.chrome = {
+        storage: {
+          sync: {
+            get: (defaults, cb) => cb({ ...defaults, ...store }),
+            set: (obj) => {
+              const changes = {};
+              for (const [k, v] of Object.entries(obj)) {
+                store[k] = v;
+                changes[k] = { newValue: v };
+              }
+              onChangedCb && onChangedCb(changes, "sync");
+            },
+          },
+          onChanged: { addListener: (cb) => (onChangedCb = cb) },
+        },
+        runtime: { onMessage: { addListener: () => {} } },
+      };
+      window.__setSetting = (k, v) => chrome.storage.sync.set({ [k]: v });
+
+      // --- layout-thrash detector -------------------------------------------
+      // The flicker bug was hiding a post inside the same loop that measured
+      // the next one: every write invalidates layout, so the next measurement
+      // forces a synchronous reflow. Record reads and writes in order; a scan
+      // is synchronous, so events cluster into bursts. Within one burst, a
+      // measurement AFTER a write means the thrash is back.
+      const trace = [];
+      const realRect = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function () {
+        trace.push({
+          t: performance.now(),
+          kind: "read",
+          from: (new Error().stack || "").split("\n").slice(2, 4).join(" <- "),
+        });
+        return realRect.call(this);
+      };
+      const realSetAttr = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function (name, value) {
+        if (String(name).startsWith("data-fbfc-")) {
+          trace.push({ t: performance.now(), kind: "write" });
+        }
+        return realSetAttr.call(this, name, value);
+      };
+
+      window.__thrashReport = () => {
+        // Split into bursts: a gap of >20ms means a new scan.
+        const bursts = [];
+        let cur = [];
+        for (const e of trace) {
+          if (cur.length && e.t - cur[cur.length - 1].t > 20) {
+            bursts.push(cur);
+            cur = [];
+          }
+          cur.push(e);
+        }
+        if (cur.length) bursts.push(cur);
+
+        let offenders = 0;
+        let burstsWithWrites = 0;
+        for (const b of bursts) {
+          const firstWrite = b.findIndex((e) => e.kind === "write");
+          if (firstWrite === -1) continue;
+          burstsWithWrites++;
+          const late = b.slice(firstWrite).filter((e) => e.kind === "read");
+          if (late.length) {
+            offenders++;
+            window.__lateReads = (window.__lateReads || []).concat(
+              late.slice(0, 3).map((e) => e.from)
+            );
+          }
+        }
+        return { bursts: bursts.length, burstsWithWrites, offenders };
+      };
+
+      // Hydrate case 8 late, the way Facebook fills in its post skeletons.
+      setTimeout(() => {
+        document.querySelector('[data-case="8"]').innerHTML = `
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Popsheet</a></span></span>
+                </h2>
+                <span> · </span>
+                <span style="cursor:pointer"><span>Follow</span></span>
+              </span>
+              <div style="font-size:12px;color:#65676b">11 hours ago</div>
+            </div>
+          </div>
+          <div class="body">The best singers of 1983 according to Smash Hits.</div>`;
+      }, 4500);
+    </script>
+    <script src="../content.js"></script>
+    <script>
+      const out = document.getElementById("results");
+      const hiddenNow = (c) => {
+        const post = document.querySelector(`[data-case="${c}"]`);
+        return !!post.closest("[data-fbfc-hidden]") || post.hasAttribute("data-fbfc-hidden");
+      };
+
+      function check(title, expectations) {
+        let html = `<h4>${title}</h4>`;
+        let ok = true;
+        for (const [c, want] of Object.entries(expectations)) {
+          const got = hiddenNow(c);
+          const pass = got === want;
+          ok = ok && pass;
+          html += `<div class="${pass ? "pass" : "fail"}">case ${c}: hidden=${got} want=${want} ${pass ? "✓" : "✗"}</div>`;
+        }
+        return { html, ok };
+      }
+
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      (async () => {
+        let html = "";
+        let allOk = true;
+
+        // Phase 1: defaults (follow on, join off, strict off)
+        await wait(700);
+        let r = check("Defaults: Follow on, Join off", {
+          1: true, 2: false, 3: false, 4: false, 5: true, 6: false, 7: true,
+          8: false, // still an empty skeleton at this point
+          9: true, // feed cell with no role="article"
+          10: false, // same, but the Follow is in the body
+          11: true, 12: true, 13: true, // ads: "Sponsored", "Ad", aria-label
+          14: false, // "Sponsored" in the body, below the header
+          15: true, // obfuscated ad label: only the render spells it
+          16: false, // hidden "Sponsored", visible text is a timestamp
+          17: true, 18: true, // "Ad &middot; icon" packed into one run of text
+          19: false, // "Ad-hoc meetup" must not read as "Ad"
+          20: true, // ad naming the advertiser twice (two headings)
+          21: true, // ad with NO heading at all
+          22: false, // no heading, "Sponsored" deep in the body
+          23: true, // packed run longer than the old length gate
+          24: true, // obfuscated, findable only via the render sweep
+          25: true, // obfuscated AND no heading - no path before 1.4.1
+          26: true, // heavy decoys: raw > old 32-char gate, renders "Sponsored"
+          27: true, // label mid-run: "Name / Sponsored / 4h"
+          28: true, // U+034F joiners glued into the letters (live shape)
+          29: true, // zero-width spaces inside one text node
+          30: true, // no heading AND per-letter joiners - the surviving combo
+          31: true, // label drawn as SVG text, no heading
+          32: true, // label only in an aria-label on an empty link
+          33: true, // svg use-glyph "Sponsored", resolved via its def
+          34: false, // svg use-glyph timestamp - same mechanism, must keep
+        });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Record exactly what got hidden, so the upward walk can be checked for
+        // over-reach: hiding a container that holds more than one post would
+        // take out chunks of the feed.
+        window.__hiddenSnapshot = [...document.querySelectorAll("[data-fbfc-hidden]")].map(
+          (e) => ({
+            tag: e.tagName,
+            id: e.id || "-",
+            postsInside: e.querySelectorAll("[data-case]").length,
+            reason: e.dataset.fbfcReason,
+          })
+        );
+        const overReach = window.__hiddenSnapshot.filter((h) => h.postsInside > 1);
+        if (overReach.length) {
+          allOk = false;
+          html += `<h4 class="fail">Over-reach: hid a container holding ${overReach[0].postsInside} posts</h4>`;
+        } else {
+          html += `<div class="pass">no over-reach: each hidden block holds 1 post ✓</div>`;
+        }
+
+        // Phase 2: enable Join
+        __setSetting("hideJoin", true);
+        await wait(900);
+        r = check("Join enabled", {
+          1: true, 4: true, 5: true, 7: true, 11: true, 12: true,
+          2: false, 6: false, 14: false,
+        });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 3: strict mode — only case 5 carries the banner
+        __setSetting("strict", true);
+        __setSetting("hideJoin", false);
+        await wait(900);
+        r = check("Strict mode (ads unaffected)", {
+          1: false, 4: false, 5: true, 7: false, 2: false,
+          11: true, 12: true, 13: true, 15: true, 16: false,
+        });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 4: back to defaults — must re-hide, not stay blank
+        __setSetting("strict", false);
+        await wait(900);
+        r = check("Strict off again (re-hides)", { 1: true, 5: true, 7: true });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 4b: ads off, then on again. The render pass only considers a
+        // post for a window after it first appears, so switching the rule on
+        // later must reopen that window or nothing would ever be hidden.
+        __setSetting("hideSponsored", false);
+        await wait(400);
+        r = check("Ads switched off", { 11: false, 12: false, 15: false, 17: false, 18: false, 1: true });
+        html += r.html; allOk = allOk && r.ok;
+
+        __setSetting("hideSponsored", true);
+        await wait(400);
+        r = check("Ads switched back on", { 11: true, 12: true, 15: true, 17: true, 18: true, 20: true, 21: true, 23: true, 24: true, 25: true, 26: true, 27: true, 28: true, 29: true, 30: true, 31: true, 32: true, 33: true, 16: false, 19: false, 22: false, 34: false });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 5: the late-hydration regression. Case 8 is an empty article
+        // shell that fills in at t=4500ms. Crucially there is NO settings
+        // change between phase 4 and here, so nothing resets the per-post
+        // state — the ordinary scan loop has to notice it on its own.
+        await wait(2200);
+        r = check("Post that hydrates late (no settings change)", { 8: true });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 6: master off
+        __setSetting("enabled", false);
+        await wait(600);
+        r = check("Extension off", { 1: false, 5: false, 7: false, 8: false, 11: false, 12: false, 15: false });
+        html += r.html; allOk = allOk && r.ok;
+
+        const thrash = window.__thrashReport();
+        if (thrash.burstsWithWrites === 0) {
+          allOk = false;
+          html += `<h4 class="fail">Thrash check inconclusive: no writes recorded</h4>`;
+        } else if (thrash.offenders > 0) {
+          allOk = false;
+          html += `<h4 class="fail">Layout thrash: ${thrash.offenders} of ` +
+            `${thrash.burstsWithWrites} scans measured after writing</h4>`;
+        } else {
+          html += `<h4>Rendering</h4><div class="pass">no layout thrash: all ` +
+            `${thrash.burstsWithWrites} hiding scans finished measuring before ` +
+            `writing &check;</div>`;
+        }
+
+        if (errors.length) {
+          allOk = false;
+          html += `<h4 class="fail">Errors thrown</h4><div class="fail">${errors.join("<br>")}</div>`;
+        }
+
+        out.innerHTML =
+          `<h3 class="${allOk ? "pass" : "fail"}">${allOk ? "ALL PASS" : "FAILURES"}</h3>` + html;
+        document.title = allOk ? "PASS" : "FAIL";
+      })();
+    </script>
+  </body>
+</html>

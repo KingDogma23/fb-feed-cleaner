@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FB Feed Cleaner</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1c1e21;
+        --muted: #65676b;
+        --line: #dcdfe3;
+        --accent: #1877f2;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #242526;
+          --fg: #e4e6eb;
+          --muted: #b0b3b8;
+          --line: #3a3b3c;
+        }
+      }
+      body {
+        width: 268px;
+        margin: 0;
+        padding: 14px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 14px;
+      }
+      .count {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      .count b {
+        color: var(--fg);
+      }
+      label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 7px 0;
+        cursor: pointer;
+      }
+      label + label {
+        border-top: 1px solid var(--line);
+      }
+      input[type="checkbox"] {
+        margin: 1px 0 0;
+        accent-color: var(--accent);
+      }
+      .sub {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 10px 0;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        flex: 1;
+        padding: 6px 8px;
+        font: inherit;
+        color: var(--fg);
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button.wide { width: 100%; margin-top: 6px; }
+      .ver {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--muted);
+        vertical-align: middle;
+      }
+      .note-h {
+        margin: 0 0 6px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      pre#diag {
+        margin: 0;
+        padding: 7px 8px;
+        max-height: 160px;
+        overflow: auto;
+        background: rgba(127, 127, 127, 0.12);
+        border-radius: 6px;
+        font: 10px/1.45 ui-monospace, Menlo, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>FB Feed Cleaner <span id="ver" class="ver">…</span></h1>
+    <p class="count">Hidden on this page: <b id="count">—</b></p>
+
+    <label>
+      <input type="checkbox" id="enabled" />
+      <span>Extension on</span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="hideFollow" />
+      <span
+        >Hide "Follow" posts
+        <span class="sub">Suggested posts with a Follow button in the header</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="hideJoin" />
+      <span
+        >Hide "Join" posts
+        <span class="sub">Suggested groups with a Join button</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="hideSponsored" />
+      <span
+        >Hide ads
+        <span class="sub">Posts marked "Sponsored" or "Ad"</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="strict" />
+      <span
+        >Strict mode
+        <span class="sub">Only hide posts also marked "Suggested for you"</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="placeholder" />
+      <span
+        >Show a placeholder bar
+        <span class="sub">Leave a "hidden post" strip you can expand</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="badge" />
+      <span
+        >Show status badge
+        <span class="sub">Troubleshooting overlay on the feed itself</span>
+      </span>
+    </label>
+
+    <hr />
+    <div class="row">
+      <button id="rescan" type="button">Rescan</button>
+      <button id="showAll" type="button">Show all</button>
+    </div>
+
+    <hr />
+    <p class="note-h">Diagnostics</p>
+    <pre id="diag">…</pre>
+    <button id="copy" type="button" class="wide">Copy report</button>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
