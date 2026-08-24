@@ -2,179 +2,168 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>FB Feed Cleaner</title>
+    <title>Quiet for Facebook</title>
     <style>
       :root {
         color-scheme: light dark;
         --bg: #ffffff;
-        --fg: #1c1e21;
-        --muted: #65676b;
-        --line: #dcdfe3;
-        --accent: #1877f2;
+        --card: #f4f7f5;
+        --fg: #14201b;
+        --muted: #62726a;
+        --line: #dfe7e2;
+        --brand: #1f8f6a;
+        --brand-ink: #ffffff;
+        --off: #b9c4bf;
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #242526;
-          --fg: #e4e6eb;
-          --muted: #b0b3b8;
-          --line: #3a3b3c;
+          --bg: #141816;
+          --card: #1c221f;
+          --fg: #e8efea;
+          --muted: #97a49d;
+          --line: #2a322e;
+          --brand: #35b98c;
+          --off: #3d4642;
         }
       }
+      * { box-sizing: border-box; }
       body {
-        width: 268px;
-        margin: 0;
-        padding: 14px;
-        background: var(--bg);
-        color: var(--fg);
-        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+        width: 300px; margin: 0; padding: 16px 16px 14px;
+        background: var(--bg); color: var(--fg);
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
-      h1 {
-        margin: 0 0 2px;
-        font-size: 14px;
+
+      /* ---- brand lockup ---- */
+      .brand { display: flex; align-items: center; gap: 8px; }
+      .brand img { width: 22px; height: 22px; border-radius: 6px; }
+      .brand h1 { margin: 0; font-size: 15px; letter-spacing: -0.01em; font-weight: 650; }
+      .brand h1 span { color: var(--muted); font-weight: 450; }
+      .ver { margin-left: auto; font-size: 10px; color: var(--muted);
+             font-family: ui-monospace, Menlo, monospace; }
+
+      /* ---- master switch ---- */
+      .master {
+        display: flex; align-items: center; gap: 10px;
+        margin: 14px 0 12px; padding: 11px 12px;
+        background: var(--card); border-radius: 12px;
       }
-      .count {
-        margin: 0 0 12px;
-        color: var(--muted);
+      .master .state { font-weight: 600; }
+      .master .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+      .switch { margin-left: auto; position: relative; width: 46px; height: 26px; flex: none; }
+      .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+      .track {
+        position: absolute; inset: 0; border-radius: 999px; background: var(--off);
+        transition: background .18s; pointer-events: none;
       }
-      .count b {
-        color: var(--fg);
+      .thumb {
+        position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+        border-radius: 50%; background: #fff; transition: transform .18s;
+        box-shadow: 0 1px 3px rgba(0,0,0,.3); pointer-events: none;
       }
-      label {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        padding: 7px 0;
-        cursor: pointer;
+      .switch input:checked ~ .track { background: var(--brand); }
+      .switch input:checked ~ .thumb { transform: translateX(20px); }
+      .switch input:focus-visible ~ .track { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+      /* ---- stats ---- */
+      .stats {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        background: var(--card); border-radius: 12px; padding: 12px 8px; margin-bottom: 12px;
       }
-      label + label {
-        border-top: 1px solid var(--line);
+      .stats .label {
+        grid-column: 1 / -1; text-align: center; font-size: 10px; color: var(--muted);
+        letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px;
       }
-      input[type="checkbox"] {
-        margin: 1px 0 0;
-        accent-color: var(--accent);
+      .stat { text-align: center; }
+      .stat b {
+        display: block; font-size: 19px; font-weight: 650; letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
       }
-      .sub {
-        display: block;
-        color: var(--muted);
-        font-size: 11px;
+      .stat u { display: block; font-size: 10px; color: var(--muted); text-decoration: none; }
+
+      /* ---- options ---- */
+      .opts { border-top: 1px solid var(--line); }
+      label.opt {
+        display: flex; align-items: flex-start; gap: 9px;
+        padding: 8px 0; cursor: pointer; border-bottom: 1px solid var(--line);
       }
-      hr {
-        border: 0;
-        border-top: 1px solid var(--line);
-        margin: 10px 0;
+      label.opt input { margin: 2px 0 0; accent-color: var(--brand); flex: none; }
+      .opt .t { font-size: 12.5px; }
+      .opt .s { display: block; font-size: 10.5px; color: var(--muted); }
+
+      details { margin-top: 10px; }
+      summary {
+        cursor: pointer; font-size: 11px; color: var(--muted); list-style: none;
+        padding: 4px 0;
       }
-      .row {
-        display: flex;
-        gap: 8px;
-      }
-      button {
-        flex: 1;
-        padding: 6px 8px;
-        font: inherit;
-        color: var(--fg);
-        background: transparent;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      button:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-      button.wide { width: 100%; margin-top: 6px; }
-      .ver {
-        font-size: 10px;
-        font-weight: 400;
-        color: var(--muted);
-        vertical-align: middle;
-      }
-      .note-h {
-        margin: 0 0 6px;
-        font-size: 10px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-      pre#diag {
-        margin: 0;
-        padding: 7px 8px;
-        max-height: 160px;
-        overflow: auto;
-        background: rgba(127, 127, 127, 0.12);
-        border-radius: 6px;
+      summary::-webkit-details-marker { display: none; }
+      summary::before { content: "▸ "; }
+      details[open] summary::before { content: "▾ "; }
+      pre {
+        margin: 6px 0 0; padding: 8px; max-height: 150px; overflow: auto;
+        background: var(--card); border-radius: 8px;
         font: 10px/1.45 ui-monospace, Menlo, monospace;
-        white-space: pre-wrap;
-        word-break: break-word;
+        white-space: pre-wrap; word-break: break-word;
       }
+      .row { display: flex; gap: 6px; margin-top: 8px; }
+      button {
+        flex: 1; padding: 7px; font: inherit; font-size: 11.5px;
+        color: var(--fg); background: transparent;
+        border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+      }
+      button:hover { border-color: var(--brand); color: var(--brand); }
     </style>
   </head>
   <body>
-    <h1>FB Feed Cleaner <span id="ver" class="ver">…</span></h1>
-    <p class="count">Hidden on this page: <b id="count">—</b></p>
-
-    <label>
-      <input type="checkbox" id="enabled" />
-      <span>Extension on</span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="hideFollow" />
-      <span
-        >Hide "Follow" posts
-        <span class="sub">Suggested posts with a Follow button in the header</span>
-      </span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="hideJoin" />
-      <span
-        >Hide "Join" posts
-        <span class="sub">Suggested groups with a Join button</span>
-      </span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="hideSponsored" />
-      <span
-        >Hide ads
-        <span class="sub">Posts marked "Sponsored" or "Ad"</span>
-      </span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="strict" />
-      <span
-        >Strict mode
-        <span class="sub">Only hide posts also marked "Suggested for you"</span>
-      </span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="placeholder" />
-      <span
-        >Show a placeholder bar
-        <span class="sub">Leave a "hidden post" strip you can expand</span>
-      </span>
-    </label>
-
-    <label>
-      <input type="checkbox" id="badge" />
-      <span
-        >Show status badge
-        <span class="sub">Troubleshooting overlay on the feed itself</span>
-      </span>
-    </label>
-
-    <hr />
-    <div class="row">
-      <button id="rescan" type="button">Rescan</button>
-      <button id="showAll" type="button">Show all</button>
+    <div class="brand">
+      <img src="icons/icon48.png" alt="" />
+      <h1>Quiet <span>for Facebook</span></h1>
+      <span class="ver" id="ver">…</span>
     </div>
 
-    <hr />
-    <p class="note-h">Diagnostics</p>
-    <pre id="diag">…</pre>
-    <button id="copy" type="button" class="wide">Copy report</button>
+    <div class="master">
+      <span>
+        <span class="state" id="stateText">Protection on</span>
+        <span class="sub" id="stateSub">Feed clutter hidden as it loads</span>
+      </span>
+      <span class="switch">
+        <input type="checkbox" id="enabled" aria-label="Protection" />
+        <span class="track"></span><span class="thumb"></span>
+      </span>
+    </div>
+
+    <div class="stats">
+      <span class="label">All time</span>
+      <span class="stat"><b id="sAds">0</b><u>Ads hidden</u></span>
+      <span class="stat"><b id="sSug">0</b><u>Suggestions</u></span>
+      <span class="stat"><b id="sGrp">0</b><u>Groups</u></span>
+    </div>
+
+    <div class="opts">
+      <label class="opt"><input type="checkbox" id="hideSponsored" /><span class="t">Hide ads
+        <span class="s">Posts marked "Sponsored" or "Ad"</span></span></label>
+      <label class="opt"><input type="checkbox" id="hideFollow" /><span class="t">Hide suggested posts
+        <span class="s">Pages you don't follow, pushed into your feed</span></span></label>
+      <label class="opt"><input type="checkbox" id="hideJoin" /><span class="t">Hide suggested groups
+        <span class="s">Groups you're not a member of</span></span></label>
+      <label class="opt"><input type="checkbox" id="hideRail" /><span class="t">Hide the Sponsored column
+        <span class="s">The ad panel on the right, above your contacts</span></span></label>
+      <label class="opt"><input type="checkbox" id="strict" /><span class="t">Strict mode
+        <span class="s">Only hide posts also marked "Suggested for you"</span></span></label>
+      <label class="opt"><input type="checkbox" id="placeholder" /><span class="t">Show a placeholder
+        <span class="s">Leave a strip with a Show button instead of removing</span></span></label>
+      <label class="opt"><input type="checkbox" id="badge" /><span class="t">Status badge
+        <span class="s">Troubleshooting overlay on the page</span></span></label>
+    </div>
+
+    <details>
+      <summary>Diagnostics</summary>
+      <pre id="diag">…</pre>
+      <div class="row">
+        <button id="copy" type="button">Copy report</button>
+        <button id="showAll" type="button">Show all</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+    </details>
 
     <script src="popup.js"></script>
   </body>

@@ -75,6 +75,7 @@
     enabled: true,
     hideFollow: true,
     hideJoin: false,
+    hideRail: true, // the right-hand "Sponsored" column
     hideSponsored: true,
     strict: false, // also require a "Suggested for you"-style marker
     placeholder: false, // leave a slim bar instead of removing outright
@@ -112,7 +113,74 @@
 
   // ----------------------------------------------------------------- state
 
-  const VERSION = "1.4.11";
+  // From the manifest, so the reported version can never drift from the
+  // installed one — this file and manifest.json had already diverged once.
+  const VERSION = (() => {
+    try {
+      return chrome.runtime.getManifest().version;
+    } catch {
+      return "orphaned";
+    }
+  })();
+
+  /**
+   * Lifetime totals, persisted to chrome.storage.local.
+   *
+   * Counts only — no "time saved" figure. Unlike a video ad, a hidden post has
+   * no duration to sum, so any minutes number here would be invented. Three
+   * real counts beat one plausible fiction.
+   */
+  const LIFETIME_KEY = "quietLifetime";
+  let lifetime = { follow: 0, join: 0, sponsored: 0, since: null };
+  let lifetimeDirty = false;
+
+  /**
+   * Is this content script still attached to a live extension?
+   *
+   * Updating or reloading the extension orphans the copy already running in an
+   * open tab: chrome.runtime.id goes away and chrome.storage becomes
+   * undefined, so anything on a timer keeps throwing until the page is
+   * reloaded. Every chrome.* call below is gated on this.
+   */
+  function contextAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id && chrome.storage);
+    } catch {
+      return false; // touching chrome.runtime can itself throw once orphaned
+    }
+  }
+
+  function loadLifetime() {
+    if (!contextAlive()) return;
+    try {
+      chrome.storage.local.get({ [LIFETIME_KEY]: null }, (got) => {
+        const stored = got && got[LIFETIME_KEY];
+        if (stored) lifetime = { ...lifetime, ...stored };
+        if (!lifetime.since) {
+          lifetime.since = Date.now();
+          lifetimeDirty = true;
+        }
+      });
+    } catch {
+      /* orphaned between the check and the call */
+    }
+  }
+
+  const lifetimeTimer = setInterval(() => {
+    // Stop the timer outright once orphaned, rather than throwing every 5s for
+    // as long as the tab stays open.
+    if (!contextAlive()) {
+      clearInterval(lifetimeTimer);
+      return;
+    }
+    if (!lifetimeDirty) return;
+    lifetimeDirty = false;
+    try {
+      chrome.storage.local.set({ [LIFETIME_KEY]: lifetime });
+    } catch {
+      clearInterval(lifetimeTimer);
+    }
+  }, 5000);
 
   let settings = { ...DEFAULTS };
   const hidden = new Set(); // elements currently hidden by us
@@ -136,7 +204,142 @@
    * markup; this reads it instead. Text only, truncated, and capped at a few
    * samples — enough to see whether the word is there and in what shape.
    */
-  function sampleHeader(card, refTop, band) {
+  /**
+   * Read the word behind an SVG <use> glyph reference.
+   *
+   * Facebook renders the timestamp/"Sponsored" slot as
+   * <svg><use href="#SvgXxx"/></svg>, with the word in a document-level sprite.
+   * It has already changed the scheme once — ids went from SvgT* to SvgWml*
+   * and plain getElementById lookups stopped resolving — so this tries several
+   * routes and REPORTS which one worked, rather than silently finding nothing.
+   */
+  /** djb2, base36. Short, stable, and good enough to compare drawn shapes. */
+  function hashString(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
+  /**
+   * A fingerprint of what a textless sprite actually DRAWS.
+   *
+   * With no string and no accessible name left, the outline is the only thing
+   * that distinguishes "Sponsored" from a timestamp. If Facebook emits the
+   * same outline for the same word, every ad on a page shares one hash and no
+   * two timestamps do — which is a signal, and cheap to check. Reported only;
+   * nothing acts on it yet.
+   */
+  function glyphShape(def) {
+    if (!def) return null;
+    const shapes = def.querySelectorAll("path, polygon, rect, circle, ellipse");
+    let d = "";
+    for (const shape of shapes) {
+      d += shape.getAttribute("d") || shape.getAttribute("points") || "";
+      if (d.length > 4000) break;
+    }
+    return { n: shapes.length, len: d.length, hash: hashString(d) };
+  }
+
+  /** The id a <use> points at, or "" when it carries no fragment. */
+  function refIdOf(use) {
+    const raw = use.getAttribute("href") || use.getAttribute("xlink:href") || "";
+    return raw.includes("#") ? raw.slice(raw.indexOf("#") + 1) : "";
+  }
+
+  /** Look an id up, tolerating ids getElementById will not return. */
+  function defById(id) {
+    let def = null;
+    try {
+      def = document.getElementById(id);
+    } catch {
+      /* ids containing characters getElementById dislikes */
+    }
+    if (def) return def;
+    try {
+      // Quoted-string escaping, not CSS.escape: identifier escapes do not
+      // match inside a quoted attribute selector.
+      return document.querySelector(`[id="${id.replace(/["\\]/g, "\\$&")}"]`);
+    } catch {
+      return null;
+    }
+  }
+
+  const GLYPH_MAX_HOPS = 6;
+
+  /**
+   * Recover the word a glyph reference draws.
+   *
+   * Facebook CHAINS these references: the meta row holds
+   * `<use href="#SvgWml151">`, `#SvgWml151` is an `<svg>` whose only child is
+   * another `<use href="#SvgWml152">`, and only `#SvgWml152` is the `<text>`
+   * holding the word. Verified live: that chain ends in "Sponsored" on an ad
+   * and "23 hours ago" on an ordinary post. Stopping at the first hop finds an
+   * empty element and looks exactly like an unreadable glyph, which is what
+   * made this look unwinnable.
+   *
+   * The chain is followed to a bounded depth, with a visited set so a
+   * self-referencing sprite cannot spin. Only if it yields nothing do the
+   * accessible-name routes run.
+   */
+  function resolveGlyph(use) {
+    const first = refIdOf(use);
+    if (!first) return { id: "?", how: "no-fragment", text: "" };
+
+    let id = first;
+    let def = null;
+    const seen = new Set();
+
+    for (let hop = 0; hop < GLYPH_MAX_HOPS; hop++) {
+      if (!id || seen.has(id)) break;
+      seen.add(id);
+
+      def = defById(id);
+      if (!def) break;
+
+      const text = normalise(def.textContent || "");
+      if (text) return { id, how: hop === 0 ? "byId" : `chain+${hop}`, text, def };
+
+      const nested = def.querySelector("use");
+      if (!nested) break;
+      id = refIdOf(nested);
+    }
+
+    // Nothing written anywhere in the chain: fall back to the glyph's
+    // accessible name, which is what a screen reader would announce.
+    const svg = use.closest("svg");
+    if (svg) {
+      const label = svg.getAttribute("aria-label");
+      if (label) return { id: first, how: "svgAria", text: normalise(label) };
+
+      const by = svg.getAttribute("aria-labelledby");
+      if (by) {
+        const named = by
+          .split(/\s+/)
+          .map((ref) => document.getElementById(ref))
+          .filter(Boolean)
+          .map((n) => n.textContent || "")
+          .join(" ");
+        const text = normalise(named);
+        if (text) return { id: first, how: "svgLabelledBy", text };
+      }
+
+      const title = svg.querySelector("title");
+      if (title) {
+        const text = normalise(title.textContent || "");
+        if (text) return { id: first, how: "svgTitle", text };
+      }
+    }
+
+    const labelled = use.closest("[aria-label]");
+    if (labelled) {
+      const text = normalise(labelled.getAttribute("aria-label") || "");
+      if (text) return { id: first, how: "ancestorAria", text };
+    }
+
+    return { id: first, how: def ? "SHAPES-ONLY" : "UNRESOLVED", text: "", def };
+  }
+
+  function sampleHeader(card, refTop, band, post) {
     const bits = [];
     for (const el of card.querySelectorAll("*")) {
       if (bits.length >= 12) break;
@@ -165,13 +368,30 @@
         if (txt) {
           inner = `text:"${normalise(txt.textContent).slice(0, 14)}"`;
         } else if (use) {
-          const href = use.getAttribute("href") || use.getAttribute("xlink:href") || "?";
-          const def = href.startsWith("#") ? document.getElementById(href.slice(1)) : null;
-          const word = def ? normalise(def.textContent || "").slice(0, 14) : "";
-          inner = `use:${href.slice(0, 12)}${word ? `="${word}"` : ""}`;
+          const g = resolveGlyph(use);
+          if (g.text) {
+            inner = `use:${g.id.slice(0, 12)}="${g.text.slice(0, 14)}"(${g.how})`;
+          } else {
+            // Nothing names it, so the only thing left to report is its shape:
+            // how wide the word is painted, and at what type size. "Sponsored"
+            // and "4h" are the same mechanism and differ only in that.
+            const box = el.getBoundingClientRect();
+            const fs = Math.round(parseFloat(getComputedStyle(el).fontSize) || 0);
+            const shape = glyphShape(g.def);
+            const sig = shape ? ` shape=${shape.n}/${shape.hash}/${shape.len}` : "";
+            inner = `use:${g.id.slice(0, 12)}=${g.how} w=${Math.round(box.width)} fs=${fs}${sig}`;
+          }
         } else {
           inner = [...el.children].map((c) => c.tagName.toLowerCase()).slice(0, 3).join(",");
         }
+        // A glyph svg often carries a name as well as a reference. Report it:
+        // printing only the reference is what hid the accessible label from
+        // every report so far.
+        const named = el.querySelector("title");
+        const namedText = named ? normalise(named.textContent || "") : "";
+        const by = el.getAttribute("aria-labelledby");
+        if (namedText) inner += ` title:"${namedText.slice(0, 14)}"`;
+        else if (by) inner += ` labelledby:${by.slice(0, 12)}`;
         bits.push(`<svg${attr ? ` "${attr.slice(0, 16)}"` : ""} ${inner}>`);
         continue;
       }
@@ -182,13 +402,33 @@
       }
       if (attr) bits.push(`<${tag} "${attr.slice(0, 16)}">`);
 
-      if (el.children.length) continue; // text only from leaves, to avoid repeats
       const raw = (el.textContent || "").replace(/\s+/g, " ").trim();
+
+      // A container whose children are single letters is the scrambled-label
+      // shape: report what it PAINTS, since its stored order is meaningless.
+      if (el.children.length) {
+        if (el.childElementCount < 4 || el.childElementCount > 40) continue;
+        if (raw.replace(INVISIBLES, "").length > 24) continue;
+        const painted = renderedText(el, 32);
+        if (painted) bits.push(`<${tag} x${el.childElementCount} paints:"${painted.slice(0, 20)}">`);
+        continue;
+      }
+
       const shown = visibleText(el);
       if (!raw && !shown) continue;
       bits.push(raw === shown ? raw.slice(0, 24) : `${raw.slice(0, 18)}>${shown.slice(0, 18)}`);
     }
-    return bits.join(" | ").slice(0, 300) || "(nothing in band)";
+    const marks = [];
+    if (post) {
+      if (post.querySelector('a[href*="l.facebook.com/l.php"]')) marks.push("outbound");
+      if (post.querySelector('[aria-label="Sponsored"], [aria-label="Ad"]')) marks.push("adattr");
+      const cta = /^(Sign up|Shop now|Learn more|Download|Book now|Get offer|Install now|Send message|Subscribe|Apply now)$/;
+      for (const el of post.querySelectorAll('[role="button"], a[role="link"] span')) {
+        if (cta.test(normalise(el.textContent))) { marks.push("cta"); break; }
+      }
+    }
+    const prefix = marks.length ? `[${marks.join(",")}] ` : "";
+    return (prefix + bits.join(" | ")).slice(0, 340) || "(nothing in band)";
   }
   let tally = { labels: 0, rejected: 0, reasons: {} };
 
@@ -509,6 +749,83 @@
    * "Sponsored". Matching raw text cannot see through that; walking the tree
    * and skipping hidden subtrees can.
    */
+  /**
+   * Could `raw` possibly spell `word` once decoys are removed?
+   *
+   * A cheap gate in front of renderedText(), which is expensive: it measures
+   * every text node. If the raw string does not even contain enough of each
+   * letter, no amount of reordering will produce the word.
+   */
+  function mightSpell(raw, word) {
+    if (!raw || raw.length > 120) return false;
+    const have = Object.create(null);
+    for (const ch of raw.replace(INVISIBLES, "").toLowerCase()) {
+      have[ch] = (have[ch] || 0) + 1;
+    }
+    for (const ch of word.toLowerCase()) {
+      if (!have[ch]) return false;
+      have[ch]--;
+    }
+    return true;
+  }
+
+  /**
+   * The element's text in the order it is PAINTED, not the order it is stored.
+   *
+   * Facebook now splits a label into one element per letter, shuffles them in
+   * the DOM and puts them back in reading order with CSS (flex `order`), so
+   * textContent yields "dtSsonrpo" for a row that plainly reads "Sponsored".
+   * Every string-based approach fails on that by construction. Each visible
+   * text node is measured and the fragments are sorted by line, then by
+   * horizontal position, which reconstructs what a person actually sees.
+   *
+   * Hidden decoy letters are dropped by the same visibility rules visibleText
+   * uses, so they never reach the sort.
+   */
+  function renderedText(el, cap = 48) {
+    const parts = [];
+
+    (function walk(node) {
+      for (const child of node.childNodes) {
+        if (parts.length >= 80) return;
+
+        if (child.nodeType === Node.TEXT_NODE) {
+          const value = child.nodeValue;
+          if (!value || !value.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(child);
+          const box = range.getBoundingClientRect();
+          if (box.width === 0 && box.height === 0) continue;
+          parts.push({ top: box.top, left: box.left, text: value });
+          continue;
+        }
+
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        if (child.getAttribute("aria-hidden") === "true") continue;
+
+        const cs = getComputedStyle(child);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        if (parseFloat(cs.opacity) === 0) continue;
+        if (cs.fontSize === "0px") continue;
+
+        const rect = child.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+
+        walk(child);
+      }
+    })(el);
+
+    // Group into lines before sorting horizontally: letters on the same line
+    // vary by a pixel or two, and a plain top-then-left sort would interleave
+    // two lines whose tops differ by less than the rounding step.
+    parts.sort((a, b) => {
+      const line = Math.round(a.top / 4) - Math.round(b.top / 4);
+      return line !== 0 ? line : a.left - b.left;
+    });
+
+    return normalise(parts.map((p) => p.text).join("")).slice(0, cap * 2);
+  }
+
   function visibleText(el, cap = 48) {
     let out = "";
 
@@ -572,6 +889,9 @@
   function findLabelInHeader(card, refTop, band, rule) {
     if (!card) return null;
     const top = refTop;
+    // Cap the painted-order reconstructions per post: it is the expensive
+    // path, and a header has only a handful of plausible label containers.
+    let paintedBudget = 12;
 
     // Every element type, not a curated list. The live feed's charity ads
     // carry a meta row whose sampled text is "Name | bullet | See more" — the
@@ -579,7 +899,14 @@
     // Whatever draws it (SVG <text>, an aria-label on an empty link, an image
     // alt), assuming its tag was the same mistake as assuming its string.
     for (const el of card.querySelectorAll("*")) {
-      const rect = el.getBoundingClientRect();
+      let rect = el.getBoundingClientRect();
+      // A <use> whose reference cannot be resolved draws nothing and so has no
+      // box of its own. That is exactly the case worth catching, so measure it
+      // by the <svg> that holds it rather than discarding it as invisible.
+      if (rect.width === 0 && rect.height === 0 && el.tagName === "use") {
+        const owner = el.closest("svg");
+        if (owner) rect = owner.getBoundingClientRect();
+      }
       if (rect.width === 0 && rect.height === 0) continue;
 
       const drop = rect.top - top;
@@ -592,20 +919,22 @@
         if (v && v.length <= 64 && matchesLabel(rule, normalise(v))) return el;
       }
 
+      // An <svg> takes its accessible name from a <title> CHILD, not a title
+      // attribute — the loop above cannot see it.
+      if (el.tagName === "svg") {
+        const t = el.querySelector("title");
+        const name = t && normalise(t.textContent || "");
+        if (name && name.length <= 64 && matchesLabel(rule, name)) return el;
+      }
+
       // Glyph-reference labels. Facebook renders the timestamp/"Sponsored"
       // slot as <svg><use href="#SvgT..."/></svg> — the word lives in a <defs>
       // element elsewhere in the document and the post itself contains NO
       // string. Sampled live: every meta row carried "svg use:#SvgTnnn" in
       // exactly that position. Following the reference recovers the word.
       if (el.tagName === "use" || el.tagName === "USE") {
-        const href = el.getAttribute("href") || el.getAttribute("xlink:href") || "";
-        if (href.startsWith("#")) {
-          const def = document.getElementById(href.slice(1));
-          if (def) {
-            const word = normalise(def.textContent || "");
-            if (word && word.length <= 64 && matchesLabel(rule, word)) return el;
-          }
-        }
+        const g = resolveGlyph(el);
+        if (g.text && g.text.length <= 64 && matchesLabel(rule, g.text)) return el;
       }
 
       // Text-borne labels. The raw cap is a loose sanity bound only — decoy
@@ -616,9 +945,25 @@
       const raw = el.textContent;
       if (!raw || raw.length > 400) continue;
       const shown = visibleText(el, 64);
-      if (!shown || shown.length > 48) continue;
+      if (shown && shown.length <= 48 && matchesLabel(rule, shown)) return el;
 
-      if (matchesLabel(rule, shown)) return el;
+      // Letters scrambled in the DOM and reordered by CSS. Only attempted when
+      // the raw text could actually spell the label, and only on containers
+      // small enough to be a label rather than a paragraph — measuring every
+      // text node is far too expensive to do speculatively.
+      if (paintedBudget > 0 && el.childElementCount >= 2 && el.childElementCount <= 40) {
+        for (const label of rule.labels) {
+          if (!mightSpell(raw, label)) continue;
+          paintedBudget--;
+          const painted = renderedText(el, 64);
+          if (painted && painted !== shown && painted.length <= 48 &&
+              matchesLabel(rule, painted)) {
+            tally.byPainted = (tally.byPainted || 0) + 1;
+            return el;
+          }
+          break;
+        }
+      }
     }
     return null;
   }
@@ -695,6 +1040,92 @@
   }
 
   /** Does the post's header carry a "Suggested for you"-style marker? */
+  // Words that must never be inside anything this hides. The rail sits directly
+  // above Contacts and Group chats, so an over-reaching walk would take the
+  // user's contact list with it — a far worse outcome than a visible ad.
+  const RAIL_PROTECTED = ["Contacts", "Group chats", "Group conversations", "Birthdays"];
+  // Measured against the live rail: the heading sits ten nested one-line boxes
+  // below the panel, so the walk is bounded by SIZE, not by depth. A block only
+  // counts as the panel once it is taller than a text row; it is abandoned if
+  // it grows taller than a plausible ad card or wider than the rail itself.
+  const RAIL_MAX_DEPTH = 20;
+  const RAIL_PANEL_MIN_PX = 80;
+  const RAIL_MAX_HEIGHT = 700;
+  const RAIL_MAX_WIDTH_FRAC = 0.45;
+
+  /**
+   * Hide the right-hand "Sponsored" column.
+   *
+   * Deliberately separate from the feed logic: this is a titled section, not a
+   * post, so it is found by its heading and then bounded hard. Every guard
+   * below exists to make hiding the wrong block impossible rather than
+   * unlikely.
+   *
+   * Measures only — it must run in the scan's read phase. Hiding a block here
+   * would invalidate layout for every rect still to be read, which is the
+   * flicker bug the harness's thrash assertion exists to catch.
+   */
+  function planRail() {
+    const found = [];
+    if (!settings.hideRail) return found;
+
+    for (const el of document.querySelectorAll("span, h3, h4, div")) {
+      const raw = el.textContent || "";
+      if (!raw || raw.length > 120) continue;
+
+      // The rail heading gets the same obfuscation the feed labels do, so it
+      // is read the same way: plainly first, then in painted order if the raw
+      // string could spell the word once decoys and shuffling are undone.
+      let label = normalise(raw);
+      if (label !== "Sponsored") {
+        if (el.childElementCount < 2 || el.childElementCount > 40) continue;
+        if (!mightSpell(raw, "Sponsored")) continue;
+        label = renderedText(el, 32);
+        if (label !== "Sponsored") continue;
+      } else if (el.children.length) {
+        continue; // a plain wrapper repeating its child's text
+      }
+
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      // The rail lives in the right-hand portion of the page; the feed's own
+      // "Sponsored" labels do not.
+      // A genuinely narrow window is still a real window, so use its own
+      // width; only an implausible reading (0 in an unrendered viewport)
+      // falls back, because a 0-derived threshold lets every label through.
+      const measured = Math.max(
+        window.innerWidth || 0,
+        document.documentElement.clientWidth || 0
+      );
+      const vw = measured > 320 ? measured : 1280;
+      if (rect.left < vw * 0.55) continue;
+
+      // Walk up until a block is actually panel-sized, stopping the moment it
+      // would swallow anything protected, outgrow an ad card, or spread wider
+      // than the rail. An 8-level cap found only the heading's own wrappers.
+      let node = el.parentElement;
+      let chosen = null;
+      for (let d = 0; node && node !== document.body && d < RAIL_MAX_DEPTH; d++) {
+        const r = node.getBoundingClientRect();
+        if (r.height > RAIL_MAX_HEIGHT) break;
+        if (r.width > vw * RAIL_MAX_WIDTH_FRAC) break;
+        const text = node.textContent || "";
+        if (RAIL_PROTECTED.some((w) => text.includes(w))) break;
+        chosen = node;
+        if (r.height >= RAIL_PANEL_MIN_PX) break; // a section, not a text row
+        node = node.parentElement;
+      }
+
+      // Only ever hide something panel-sized. If the walk ran out without
+      // finding one, hide nothing — a stray heading is not an ad column.
+      if (chosen && !chosen.dataset.fbfcHidden && !found.includes(chosen) &&
+          chosen.getBoundingClientRect().height >= RAIL_PANEL_MIN_PX) {
+        found.push(chosen);
+      }
+    }
+    return found;
+  }
+
   function headerHasSuggestedMarker(post) {
     const top = post.getBoundingClientRect().top;
     for (const el of post.querySelectorAll("span, h3, h4, div")) {
@@ -735,6 +1166,10 @@
     }
     hidden.add(target);
     sessionCount++;
+    if (reason in lifetime) {
+      lifetime[reason]++;
+      lifetimeDirty = true;
+    }
   }
 
   function unhide(target, { manual = false } = {}) {
@@ -901,7 +1336,7 @@
         session.sweeps++;
         const el = findLabelInHeader(card, refTop, band, rule);
         if (!el) {
-          const sample = sampleHeader(card, refTop, band);
+          const sample = sampleHeader(card, refTop, band, post);
           // Rolling, deduped, composer excluded: the fixed 4-slot buffer filled
           // with the "What's on your mind" box in the first second and the ad
           // rows that mattered never made it into the report.
@@ -924,8 +1359,13 @@
       }
     }
 
+    // Last read of the scan: the rail is measured here, with the feed, so that
+    // every rect in this pass is taken against one unmodified layout.
+    const railBlocks = planRail();
+
     // ---- 3. mutate (writes) ----
     for (const { post, rule } of toHide) hide(post, rule.id);
+    for (const block of railBlocks) hide(block, "sponsored");
     updateBadge();
   }
 
@@ -935,6 +1375,10 @@
 
   /** Facebook's DOM is hostile; never let one bad post kill the observer. */
   function safeScan() {
+    if (!contextAlive()) {
+      shutdown();
+      return;
+    }
     try {
       scan();
     } catch (err) {
@@ -965,27 +1409,58 @@
 
   // ----------------------------------------------------------------- boot
 
+  let observer = null;
+
+  /**
+   * Go completely inert.
+   *
+   * Once the extension is reloaded, this copy is orphaned: it can never talk
+   * to the extension again, and anything it keeps doing is pure noise in a
+   * page that now has a NEW content script doing the real work. Guarding the
+   * chrome.* calls stops the exceptions; detaching stops the wasted scanning
+   * and the observer that triggers it.
+   */
+  function shutdown() {
+    observer?.disconnect();
+    observer = null;
+    clearInterval(lifetimeTimer);
+    window.removeEventListener("scroll", scheduleScan);
+    window.removeEventListener("popstate", scheduleScan);
+  }
+
   function start() {
     console.log(`[FB Feed Cleaner ${VERSION}] active on ${location.pathname}`);
     safeScan();
     // Give the feed time to hydrate before judging whether we did anything.
     setTimeout(report, 6000);
-    new MutationObserver(scheduleScan).observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    observer = new MutationObserver(scheduleScan);
+    observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("scroll", scheduleScan, { passive: true });
     // Feed re-renders on SPA navigation without a page load.
     window.addEventListener("popstate", scheduleScan);
   }
 
-  chrome.storage.sync.get(DEFAULTS, (stored) => {
-    settings = { ...DEFAULTS, ...stored };
+  loadLifetime();
+
+  function boot(stored) {
+    settings = { ...DEFAULTS, ...(stored || {}) };
     if (document.body) start();
     else document.addEventListener("DOMContentLoaded", start, { once: true });
-  });
+  }
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  try {
+    chrome.storage.sync.get(DEFAULTS, boot);
+  } catch {
+    // Orphaned before we ever read settings: still filter, using defaults,
+    // rather than leaving the page unprotected.
+    boot(null);
+  }
+
+  if (contextAlive()) chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[LIFETIME_KEY]) {
+      lifetime = { ...lifetime, ...(changes[LIFETIME_KEY].newValue || {}) };
+      return;
+    }
     if (area !== "sync") return;
     for (const [key, { newValue }] of Object.entries(changes)) settings[key] = newValue;
 
@@ -1011,6 +1486,7 @@
     return {
       version: VERSION,
       url: location.pathname,
+      lifetime: { ...lifetime },
       settings: { ...settings },
       hidden: hidden.size,
       byRule,
@@ -1035,7 +1511,7 @@
     };
   }
 
-  chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
+  if (contextAlive()) chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
     if (msg?.type === "diagnostics") {
       respond(diagnostics());
     } else if (msg?.type === "getStats") {

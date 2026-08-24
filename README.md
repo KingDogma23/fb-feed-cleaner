@@ -1,14 +1,15 @@
-# FB Feed Cleaner
+# Quiet for Facebook
 
 A Chrome extension that strips the clutter out of your Facebook news feed.
 
-It removes three kinds of post you never asked to see:
+It removes the things you never asked to see:
 
 | | |
 | --- | --- |
-| **Suggested posts** | Pages you don't follow, pushed into your feed |
 | **Ads** | Posts marked "Sponsored" or "Ad" |
+| **Suggested posts** | Pages you don't follow, pushed into your feed |
 | **Suggested groups** | Groups you're not a member of (optional, off by default) |
+| **The Sponsored column** | The ad panel on the right, above your contacts |
 
 Your own posts, your friends' posts, groups you're in and pages you already
 follow are never touched. Nothing is blocked, unfollowed or reported on your
@@ -37,14 +38,18 @@ Click the extension icon. Changes apply immediately — no reload needed.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| Extension on | on | Master switch |
-| Hide "Follow" posts | on | Suggested posts from pages you don't follow |
+| Protection | on | Master switch |
 | Hide ads | on | Posts marked "Sponsored" or "Ad" |
-| Hide "Join" posts | off | Suggested groups |
-| Strict mode | off | Makes the Follow filter fussier — only hides posts also marked "Suggested for you". Doesn't affect ads |
-| Show a placeholder bar | off | Leaves a small strip with a **Show** button instead of removing the post, so you can see what was caught |
-| Show status badge | off | Troubleshooting overlay on the feed |
-| Rescan / Show all | — | Re-run the filter, or reveal everything on the page |
+| Hide suggested posts | on | Pages you don't follow, pushed into your feed |
+| Hide suggested groups | off | Groups you're not a member of |
+| Hide the Sponsored column | on | The ad panel on the right, above your contacts |
+| Strict mode | off | Makes the suggested-post filter fussier — only hides posts also marked "Suggested for you". Doesn't affect ads |
+| Show a placeholder | off | Leaves a small strip with a **Show** button instead of removing the post, so you can see what was caught |
+| Status badge | off | Troubleshooting overlay on the feed |
+
+The popup also keeps a running count of what it has hidden for you — ads,
+suggested posts and groups — and has **Copy report**, **Show all** and
+**Reset** buttons underneath.
 
 ## Worth knowing
 
@@ -83,19 +88,22 @@ labels this depends on specifically to break tools like this one, and a public
 write-up of the current approach is a roadmap for breaking it. The code is
 commented for anyone maintaining it.
 
-There's a regression suite covering 34 real-world post shapes — every disguise
-and false-positive case found in the wild, so a fix can't silently undo an
-earlier one. It stubs the extension APIs and loads the content script unmodified:
+There's a regression suite of 109 assertions covering every real-world post
+shape found in the wild — each disguise, and each case that must NOT be hidden,
+so a fix cannot silently undo an earlier one. It stubs the extension APIs and
+loads the content script unmodified:
 
 ```bash
 python3 -m http.server 8731
 ```
 
 Then open <http://localhost:8731/test/mock-feed.html>. The panel reports
-**ALL PASS** or lists failures. It also asserts two things beyond the cases: that
-each hidden block contains exactly one post (no over-reach into the feed), and
-that no scan measures the page after writing to it (which would cause visible
-flicker).
+**ALL PASS** or lists failures. It also asserts several things beyond the
+individual cases: that each hidden block contains exactly one post (no
+over-reach into the feed), that the right-hand column can be removed without
+taking your contacts with it, that no scan measures the page after writing to it
+(which would cause visible flicker), and that the script goes quiet instead of
+throwing when the extension is reloaded under an open tab.
 
 All names and content in the test fixtures are fictional.
 

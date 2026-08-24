@@ -1,24 +1,20 @@
 const DEFAULTS = {
   enabled: true,
+  hideSponsored: true,
   hideFollow: true,
   hideJoin: false,
-  hideSponsored: true,
+  hideRail: true,
   strict: false,
   placeholder: false,
   badge: false,
 };
 
 const KEYS = Object.keys(DEFAULTS);
-const countEl = document.getElementById("count");
+const $ = (id) => document.getElementById(id);
+let lastReport = "";
 
-async function activeTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
-}
-
-/** Content script is only present on facebook.com; ignore failures elsewhere. */
 async function tell(message) {
-  const tab = await activeTab();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return null;
   try {
     return await chrome.tabs.sendMessage(tab.id, message);
@@ -27,96 +23,96 @@ async function tell(message) {
   }
 }
 
-const diagEl = document.getElementById("diag");
-const verEl = document.getElementById("ver");
-let lastReport = "";
+const compact = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : (n || 0).toLocaleString());
 
-/**
- * The version shown here is the one actually running in the page, not the one
- * in the manifest — those differ whenever Chrome is still serving an older
- * build because the extension was not reloaded after an update.
- */
-function renderDiagnostics(d) {
+function render(d) {
+  const on = $("enabled").checked;
+  $("stateText").textContent = on ? "Protection on" : "Protection off";
+  $("stateSub").textContent = on
+    ? "Feed clutter hidden as it loads"
+    : "Facebook is showing you everything";
+
   if (!d) {
-    verEl.textContent = "";
-    diagEl.textContent =
-      "Not running on this tab.\n\n" +
-      "Open a facebook.com tab, or reload it — a content script only attaches " +
-      "at page load. If you just updated the extension, reload it on " +
-      "chrome://extensions first.";
-    lastReport = diagEl.textContent;
+    $("ver").textContent = "";
+    $("diag").textContent =
+      "Not running on this tab.\n\nOpen a facebook.com tab, or reload it — a " +
+      "content script only attaches at page load. If you just updated the " +
+      "extension, reload it on chrome://extensions first.";
+    lastReport = $("diag").textContent;
     return;
   }
 
-  verEl.textContent = "v" + d.version;
-  const on = Object.entries(d.settings)
-    .filter(([, v]) => v === true)
-    .map(([k]) => k)
-    .join(", ");
-  const rules = Object.entries(d.byRule).map(([k, v]) => `${k}=${v}`).join(" ");
-  const reasons = Object.entries(d.reasons)
+  $("ver").textContent = "v" + d.version;
+
+  const lt = d.lifetime || { sponsored: 0, follow: 0, join: 0 };
+  $("sAds").textContent = compact(lt.sponsored);
+  $("sSug").textContent = compact(lt.follow);
+  $("sGrp").textContent = compact(lt.join);
+
+  const rules = Object.entries(d.byRule || {}).map(([k, v]) => `${k}=${v}`).join(" ");
+  const reasons = Object.entries(d.reasons || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([why, n]) => `  ${n} x ${why}`)
     .join("\n");
 
   lastReport = [
-    `FB Feed Cleaner v${d.version}  (page ${d.url})`,
-    `on: ${on || "nothing"}`,
-    `hidden: ${d.hidden}${rules ? "  [" + rules + "]" : ""}`,
+    `Quiet for Facebook v${d.version}  (page ${d.url})`,
+    `all time: ${lt.sponsored} ads, ${lt.follow} suggested posts, ${lt.join} groups`,
+    `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
+    `hidden this page: ${d.hidden}${rules ? "  [" + rules + "]" : ""}`,
     `labels seen: ${d.labelsSeen} (${d.labelsByRender ?? 0} needed de-obfuscating)`,
-    `SESSION: ${d.session?.sweeps ?? 0} sweeps run, ` +
-      `${d.session?.sweepMatches ?? 0} ads found by de-obfuscating, ` +
-      `feed cells seen ${d.session?.feedCells ?? 0}`,
-    `this scan: examined ${d.render?.examined ?? 0}, ` +
-      `feed cells ${d.render?.feedCells ?? 0} (${d.render?.cardsNoHeading ?? 0} heading-less), ` +
-      `skipped ${d.render?.skippedDecided ?? 0} decided / ` +
-      `${d.render?.skippedBudget ?? 0} cooldown / ${d.render?.skippedEmpty ?? 0} empty`,
-    reasons ? `rejected:\n${reasons}` : "rejected: none",
-    (d.session?.samples?.length
-      ? `meta rows the sweep could not match:\n` +
-        d.session.samples.map((x) => `  ${x}`).join("\n")
-      : `meta rows: none captured`),
+    `sweep: examined ${d.render?.examined ?? 0}, feed cells ${d.render?.feedCells ?? 0} ` +
+      `(${d.render?.cardsNoHeading ?? 0} heading-less)`,
+    reasons ? `rejected:\n${reasons}` : `rejected: none`,
+    d.session?.samples?.length
+      ? `meta rows not matched:\n` + d.session.samples.map((x) => `  ${x}`).join("\n")
+      : `meta rows: none captured`,
     `page: main=${d.structure.roleMain} headings=${d.structure.headings} ` +
       `articles=${d.structure.articles} feeds=${d.structure.feeds}`,
   ].join("\n");
 
-  diagEl.textContent = lastReport;
+  $("diag").textContent = lastReport;
 }
 
-async function refreshCount() {
-  const stats = await tell({ type: "getStats" });
-  countEl.textContent = stats ? String(stats.visible) : "not on Facebook";
-  renderDiagnostics(await tell({ type: "diagnostics" }));
+async function refresh() {
+  render(await tell({ type: "diagnostics" }));
 }
 
 chrome.storage.sync.get(DEFAULTS, (stored) => {
-  for (const key of KEYS) {
-    document.getElementById(key).checked = stored[key];
-  }
+  for (const k of KEYS) $(k).checked = stored[k];
+  refresh();
 });
 
-for (const key of KEYS) {
-  document.getElementById(key).addEventListener("change", (e) => {
-    chrome.storage.sync.set({ [key]: e.target.checked });
-    setTimeout(refreshCount, 400);
+for (const k of KEYS) {
+  $(k).addEventListener("change", (e) => {
+    chrome.storage.sync.set({ [k]: e.target.checked });
+    setTimeout(refresh, 300);
   });
 }
 
-document.getElementById("rescan").addEventListener("click", async () => {
-  await tell({ type: "rescan" });
-  refreshCount();
-});
-
-document.getElementById("showAll").addEventListener("click", async () => {
-  await tell({ type: "unhideAll" });
-  refreshCount();
-});
-
-document.getElementById("copy").addEventListener("click", async (e) => {
+$("copy").addEventListener("click", async (e) => {
   await navigator.clipboard.writeText(lastReport);
   e.target.textContent = "Copied";
   setTimeout(() => (e.target.textContent = "Copy report"), 1200);
 });
 
-refreshCount();
+$("showAll").addEventListener("click", async (e) => {
+  await tell({ type: "unhideAll" });
+  e.target.textContent = "Shown";
+  setTimeout(() => {
+    e.target.textContent = "Show all";
+    refresh();
+  }, 900);
+});
+
+$("reset").addEventListener("click", (e) => {
+  chrome.storage.local.set({
+    quietLifetime: { sponsored: 0, follow: 0, join: 0, since: Date.now() },
+  });
+  e.target.textContent = "Reset";
+  setTimeout(() => {
+    e.target.textContent = "Reset";
+    refresh();
+  }, 900);
+});

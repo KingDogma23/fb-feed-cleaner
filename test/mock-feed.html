@@ -711,6 +711,248 @@
           <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
         </div>
       </div>
+
+      <!-- 35: the reported regression. The sprite id was renamed and the sheet
+           is no longer in the document at all, so the reference cannot be
+           dereferenced. The accessible name on the <svg> is the fallback a
+           screen reader would read, and the only honest signal left. -->
+      <div>
+        <div class="post" data-case="35" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Harbour Financial</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>&middot;</span>
+                <svg width="70" height="14" aria-label="Sponsored"><use href="#SvgWml45"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Compare mortgage rates in minutes.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 36: same dangling reference, name carried by <title> instead. -->
+      <div>
+        <div class="post" data-case="36" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Vantage Motors</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>&middot;</span>
+                <svg width="70" height="14"><title>Sponsored</title><use href="#SvgWml46"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">0% APR this month only.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 37: an external sprite URL - the reference points outside the
+           document entirely and NOTHING names the glyph. Unresolvable must
+           mean "leave it alone": guessing here would hide real posts. -->
+      <div>
+        <div class="post" data-case="37" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Kate Ellery</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>&middot;</span>
+                <svg width="24" height="14"><use href="/rsrc.php/v3/sprite.svg#SvgWml47"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Beach walk this morning.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 38: the accessible name says "3h", not an ad label. The fallback
+           routes must be read, not merely treated as evidence of an ad. -->
+      <div>
+        <div class="post" data-case="38" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Tom Fielding</span>
+              <div style="font-size:12px;color:#65676b">
+                <span>&middot;</span>
+                <svg width="24" height="14" aria-label="3h"><use href="#SvgWml48"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Match report from Saturday.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 39: the live shape as of the v2.0.1 report. Each letter is its own
+           element, the DOM order is shuffled (d t S s o n r p o), CSS `order`
+           puts them back, and hidden decoys pad the raw string. textContent
+           spells nothing; only reading them in painted order recovers it. -->
+      <div>
+        <div class="post" data-case="39" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Scribe</span>
+              <div style="font-size:12px;color:#65676b">
+                <span style="display:inline-flex"><span style="order:9">d&#847;</span><span style="display:none">t&#847;</span><span style="order:1">S&#847;</span><span style="order:5">s&#847;</span><span style="order:6">o&#847;</span><span style="order:4">n&#847;</span><span style="order:7">r&#847;</span><span style="order:2">p&#847;</span><span style="order:3">o&#847;</span><span style="display:none">x&#847;</span><span style="order:8">e&#847;</span></span>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Record the process once.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 40: the SAME per-letter mechanism spelling an ordinary word. Reading
+           in painted order must not become an excuse to hide everything. -->
+      <div>
+        <div class="post" data-case="40" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Hannah Reed</span>
+              <div style="font-size:12px;color:#65676b">
+                <span style="display:inline-flex"><span style="order:3">e&#847;</span><span style="order:1">Y&#847;</span><span style="order:2">s&#847;</span><span style="order:4">t&#847;</span><span style="order:5">e&#847;</span><span style="order:6">r&#847;</span><span style="order:7">d&#847;</span><span style="order:8">a&#847;</span><span style="order:9">y&#847;</span></span>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Walk along the estuary.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 41: the v2.1.1 report's shape. The reference RESOLVES (byId) but the
+           sprite is drawn as vector shapes and carries no text at all, so a
+           successful lookup answers nothing. The word survives only as the
+           glyph's accessible name. -->
+      <div>
+        <div class="post" data-case="41" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Arcade Software</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14"><title>Sponsored</title><use href="#SvgShape1"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Stop making generic demos.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 42: same textless sprite, named by aria-labelledby instead. -->
+      <div>
+        <div class="post" data-case="42" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">TLDR Newsletter</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14" aria-labelledby="lblA"><use href="#SvgShape2"></use></svg>
+                <span id="lblA" style="position:absolute;width:1px;height:1px;overflow:hidden">Sponsored</span>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">1M+ readers. 5 minutes each.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 43: an ordinary post using the identical textless-sprite mechanism
+           for its TIMESTAMP. Structurally indistinguishable from 41 - only the
+           name separates them, so the name must actually be read. -->
+      <div>
+        <div class="post" data-case="43" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Mark Hammersley</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="24" height="14"><title>15h</title><use href="#SvgShape3"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">See more of the workshop build.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 44: the live mechanism, captured from the real feed. The meta row
+           references #SvgChainA, which is an <svg> holding only ANOTHER <use>;
+           the word lives one hop further on. Stopping at the first hop finds an
+           empty element that looks exactly like an unreadable glyph. -->
+      <div>
+        <div class="post" data-case="44" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">CCLG Cancer Association</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14"><use href="#SvgChainA"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Sell pin badges this September.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 45: the same chain depth carrying a timestamp, exactly as ordinary
+           posts do live ("23 hours ago"). Following the chain must not become
+           an excuse to hide whatever sits at the end of it. -->
+      <div>
+        <div class="post" data-case="45" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Punk Rock Posters</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14"><use href="#SvgChainC"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Finsbury Park, June 1996.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- 46: a sprite that references ITSELF. The walk must terminate rather
+           than spin, and the post must be left alone. -->
+      <div>
+        <div class="post" data-case="46" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span class="name">Ellen Voss</span>
+              <div style="font-size:12px;color:#65676b">
+                <svg width="70" height="14"><use href="#SvgLoop"></use></svg>
+                <span>&middot;</span> <span>&#127760;</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">Allotment update.</div>
+          <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
+        </div>
+      </div>
     </div>
     </div>
 
@@ -718,8 +960,39 @@
       <defs>
         <text id="SvgT901" font-size="12">S&#847;p&#847;o&#847;n&#847;s&#847;o&#847;r&#847;e&#847;d</text>
         <text id="SvgT902" font-size="12">2&#847;h</text>
+        <!-- Resolve fine, contain no text: the word is drawn, not written. -->
+        <symbol id="SvgShape1"><path d="M0 0h6v6H0z"></path></symbol>
+        <symbol id="SvgShape2"><path d="M0 0h6v6H0z"></path></symbol>
+        <symbol id="SvgShape3"><path d="M0 0h4v4H0z"></path></symbol>
+        <!-- Chained references, as the live feed emits them: an empty <svg>
+             wrapper whose only child points one hop further on. -->
+        <svg id="SvgChainA"><use xlink:href="#SvgChainB"></use></svg>
+        <text id="SvgChainB" font-size="12">Sponsored</text>
+        <svg id="SvgChainC"><use xlink:href="#SvgChainD"></use></svg>
+        <text id="SvgChainD" font-size="12">23 hours ago</text>
+        <!-- Points at itself: the walk must stop, not spin. -->
+        <svg id="SvgLoop"><use xlink:href="#SvgLoop"></use></svg>
       </defs>
     </svg>
+
+    <!-- The right-hand column: a Sponsored ad panel sitting directly above the
+         user's Contacts. Hiding the panel must never take Contacts with it. -->
+    <div id="rail" style="position:fixed;right:8px;top:20px;width:22%">
+      <!-- The heading is buried ten wrappers deep, as it is on the live rail:
+           every one of them is a single text row, so a depth-bounded walk
+           reaches only wrappers and never the panel itself. -->
+      <div data-case="rail-section" style="background:#fff;padding:10px;border-radius:8px">
+        <div><div><div><span><div><div>
+          <h3><span><span>Sponsored</span></span></h3>
+        </div></div></span></div></div></div>
+        <div style="height:120px;background:#eee;margin-top:6px">Ad creative</div>
+        <div>adsumo.ai</div>
+      </div>
+      <div data-case="rail-contacts" style="background:#fff;padding:10px;margin-top:10px;border-radius:8px">
+        <span>Contacts</span>
+        <div style="height:100px">Dana Silva, Sam Okafor, Priya Nair</div>
+      </div>
+    </div>
 
     <div id="results">loading…</div>
 
@@ -748,8 +1021,21 @@
             },
           },
           onChanged: { addListener: (cb) => (onChangedCb = cb) },
+          // Lifetime counters live in local storage.
+          local: {
+            get: (defaults, cb) => cb({ ...defaults }),
+            set: () => {},
+          },
         },
-        runtime: { onMessage: { addListener: () => {} } },
+        runtime: {
+          // A live extension always has an id; the content script uses its
+          // presence to tell "attached" from "orphaned by a reload".
+          id: "quiet-test-extension-id",
+          onMessage: { addListener: () => {} },
+          // VERSION is read from the manifest so it cannot drift from the
+          // installed build; the stub has to provide it.
+          getManifest: () => ({ version: "2.0.0-test" }),
+        },
       };
       window.__setSetting = (k, v) => chrome.storage.sync.set({ [k]: v });
 
@@ -776,6 +1062,9 @@
         }
         return realSetAttr.call(this, name, value);
       };
+
+      // Raw trace access, so a test can ask WHEN scans actually ran.
+      window.__traceTimes = () => trace.map((e) => ({ t: e.t, kind: e.kind }));
 
       window.__thrashReport = () => {
         // Split into bursts: a gap of >20ms means a new scan.
@@ -829,8 +1118,15 @@
     <script src="../content.js"></script>
     <script>
       const out = document.getElementById("results");
+      const hidden = (c) => {
+        const el = document.querySelector(`[data-case="${c}"]`);
+        return !!el && (!!el.closest("[data-fbfc-hidden]") || el.hasAttribute("data-fbfc-hidden"));
+      };
       const hiddenNow = (c) => {
         const post = document.querySelector(`[data-case="${c}"]`);
+        // Guarded: a typo in an expectation key used to throw here and abort
+        // the entire run with no output at all.
+        if (!post) throw new Error(`no element for data-case="${c}"`);
         return !!post.closest("[data-fbfc-hidden]") || post.hasAttribute("data-fbfc-hidden");
       };
 
@@ -880,6 +1176,18 @@
           32: true, // label only in an aria-label on an empty link
           33: true, // svg use-glyph "Sponsored", resolved via its def
           34: false, // svg use-glyph timestamp - same mechanism, must keep
+          35: true, // dangling ref, name on the <svg> aria-label
+          36: true, // dangling ref, name in a <title>
+          37: false, // external sprite, nothing names it - must not guess
+          38: false, // fallback name is "3h": read it, don't assume an ad
+          39: true, // per-letter spans, DOM shuffled, CSS `order` repaints it
+          40: false, // same mechanism spelling "Yesterday" - must keep
+          41: true, // sprite resolves but is textless; named by <title>
+          42: true, // same, named by aria-labelledby
+          43: false, // identical mechanism, but it names a timestamp
+          44: true, // CHAINED reference: the word is one hop further on
+          45: false, // same chain depth, carrying "23 hours ago"
+          46: false, // self-referencing sprite: terminate, do not spin
         });
         html += r.html; allOk = allOk && r.ok;
 
@@ -967,6 +1275,106 @@
             `${thrash.burstsWithWrites} hiding scans finished measuring before ` +
             `writing &check;</div>`;
         }
+
+        // Phase 7: the right-hand rail. Protection was switched off in phase 6,
+        // so turn it back on and let a scan run before asserting — otherwise
+        // this only measures that a disabled extension hides nothing.
+        __setSetting("enabled", true);
+        await wait(900);
+
+        // A post that arrives while you scroll must be hidden BEFORE it has
+        // painted at full height. Hiding a rendered post collapses it and
+        // jerks the feed upward — the flicker. Measured, not assumed.
+        const fresh = document.createElement("div");
+        fresh.innerHTML =
+          '<div class="post" data-case="fresh" data-expect="hide">' +
+          '<div class="hdr"><div class="avatar"></div><div>' +
+          '<h3><span class="name">Latecomer Media</span></h3>' +
+          '<div style="font-size:12px;color:#65676b"><span>Sponsored</span>' +
+          ' <span>&middot;</span></div></div></div>' +
+          '<div class="body">Arrived mid-scroll.</div>' +
+          '<div style="height:400px;background:#dfe3e6"></div></div>';
+        document.querySelector("#feed").appendChild(fresh);
+
+        const appearedAt = performance.now();
+        const timeline = [];
+        let hiddenAfter = null;
+        for (let i = 0; i < 40; i++) {
+          await wait(50);
+          timeline.push({
+            t: Math.round(performance.now() - appearedAt),
+            trace: window.__traceTimes().length,
+            hiddenOnPage: document.querySelectorAll("[data-fbfc-hidden]").length,
+            mine: !!fresh.querySelector('[data-case="fresh"]')?.closest("[data-fbfc-hidden]"),
+          });
+          const el = fresh.querySelector('[data-case="fresh"]');
+          if (el && el.closest("[data-fbfc-hidden]")) {
+            hiddenAfter = Math.round(performance.now() - appearedAt);
+            break;
+          }
+        }
+        // When did scans actually run in that window? A scan shows up as a
+        // cluster of reads; a gap over 20ms starts a new one.
+        const after = window.__traceTimes().filter((e) => e.t >= appearedAt);
+        const scanStarts = [];
+        let prev = -1e9;
+        for (const e of after) {
+          if (e.t - prev > 20) scanStarts.push(Math.round(e.t - appearedAt));
+          prev = e.t;
+        }
+        window.__latencyProbe = { hiddenAfter, scanStarts: scanStarts.slice(0, 12), timeline };
+        // Recorded, not asserted. A newly arrived ad currently takes about a
+        // second and a half to disappear, which is why the feed visibly jumps:
+        // the post paints at full height first and hiding it then collapses a
+        // rendered card. Tracking the number so any change to it is visible;
+        // it is not yet a pass/fail gate because it is not yet fixed.
+        // Only meaningful in a VISIBLE tab. Chrome clamps timers to ~1s in a
+        // background tab, which throttles both this poll loop and the
+        // extension's own scan scheduling — a hidden tab reports ~1800ms no
+        // matter how fast the hiding actually is. That artefact was mistaken
+        // for a real latency once already.
+        html += document.visibilityState === "visible"
+          ? `<h4>Arrival latency</h4><div>new ad hidden after ` +
+            `<b>${hiddenAfter === null ? "&gt;2000" : hiddenAfter}ms</b></div>`
+          : `<h4>Arrival latency</h4><div>not measured — tab is in the ` +
+            `background, where timers are clamped to ~1s and any figure here ` +
+            `is an artefact</div>`;
+        fresh.remove();
+
+
+        // The rail's ad panel must go; the contacts list beneath it must not.
+        r = check("Sponsored column", {
+          "rail-section": true,
+          "rail-contacts": false,
+        });
+        html += r.html; allOk = allOk && r.ok;
+
+        // Phase 8: orphan the extension, exactly as reloading it does to a
+        // tab that is already open. chrome.storage disappears and
+        // chrome.runtime.id goes away; nothing may throw after that.
+        const liveChrome = window.chrome;
+        window.chrome = { runtime: {}, };   // no id, no storage
+
+        // Poke the page so a scan is scheduled while orphaned: the script must
+        // notice, stand down, and stop responding to further mutations.
+        const poke = document.createElement("div");
+        document.querySelector("#feed")?.appendChild(poke);
+        await wait(1500);
+        const scansBefore = window.__thrashReport().bursts;
+        poke.appendChild(document.createElement("span"));
+        await wait(1200);
+        const scansAfter = window.__thrashReport().bursts;
+
+        if (scansAfter > scansBefore) {
+          allOk = false;
+          html += `<h4 class="fail">Orphaned context: still scanning ` +
+            `(${scansBefore} then ${scansAfter} bursts)</h4>`;
+        } else {
+          html += `<h4>Orphaned context</h4><div class="pass">detached: no ` +
+            `throw and no further scans after the extension reloaded &check;</div>`;
+        }
+        poke.remove();
+        window.chrome = liveChrome;
 
         if (errors.length) {
           allOk = false;
