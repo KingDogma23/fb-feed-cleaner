@@ -13,10 +13,25 @@ const KEYS = Object.keys(DEFAULTS);
 const $ = (id) => document.getElementById(id);
 let lastReport = "";
 
-async function tell(message) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return null;
+/**
+ * The popup outlives a reload badly too: if the extension is reloaded while
+ * this window is open, chrome.storage becomes undefined and every handler
+ * below throws into the extension's error log. Same guard as the content
+ * script.
+ */
+function alive() {
   try {
+    return !!(chrome.runtime && chrome.runtime.id && chrome.storage);
+  } catch {
+    return false;
+  }
+}
+
+async function tell(message) {
+  if (!alive()) return null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return null;
     return await chrome.tabs.sendMessage(tab.id, message);
   } catch {
     return null;
@@ -79,14 +94,29 @@ async function refresh() {
   render(await tell({ type: "diagnostics" }));
 }
 
-chrome.storage.sync.get(DEFAULTS, (stored) => {
-  for (const k of KEYS) $(k).checked = stored[k];
+function applyStored(stored) {
+  for (const k of KEYS) $(k).checked = (stored || DEFAULTS)[k];
   refresh();
-});
+}
+
+if (alive()) {
+  try {
+    chrome.storage.sync.get(DEFAULTS, applyStored);
+  } catch {
+    applyStored(null);
+  }
+} else {
+  applyStored(null);
+}
 
 for (const k of KEYS) {
   $(k).addEventListener("change", (e) => {
-    chrome.storage.sync.set({ [k]: e.target.checked });
+    if (!alive()) return;
+    try {
+      chrome.storage.sync.set({ [k]: e.target.checked });
+    } catch {
+      return;
+    }
     setTimeout(refresh, 300);
   });
 }
@@ -107,9 +137,14 @@ $("showAll").addEventListener("click", async (e) => {
 });
 
 $("reset").addEventListener("click", (e) => {
-  chrome.storage.local.set({
-    quietLifetime: { sponsored: 0, follow: 0, join: 0, since: Date.now() },
-  });
+  if (!alive()) return;
+  try {
+    chrome.storage.local.set({
+      quietLifetime: { sponsored: 0, follow: 0, join: 0, since: Date.now() },
+    });
+  } catch {
+    return;
+  }
   e.target.textContent = "Reset";
   setTimeout(() => {
     e.target.textContent = "Reset";

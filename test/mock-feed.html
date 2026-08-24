@@ -1115,7 +1115,15 @@
           <div class="body">The best singers of 1983 according to Smash Hits.</div>`;
       }, 4500);
     </script>
-    <script src="../content.js"></script>
+    <!-- Loaded with a cache-buster: the browser will otherwise serve a stale
+         copy of the script under test while the page itself reloads, which
+         silently tests the PREVIOUS build. document.write keeps them ordered
+         and synchronous, exactly like plain tags. -->
+    <script>
+      for (const src of ["../content.js"]) {
+        document.write('<script src="' + src + '?t=' + Date.now() + '"><\/script>');
+      }
+    </script>
     <script>
       const out = document.getElementById("results");
       const hidden = (c) => {
