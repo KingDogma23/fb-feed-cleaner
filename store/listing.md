@@ -1,4 +1,4 @@
-# Chrome Web Store submission — Quite for Facebook
+# Chrome Web Store submission — Quite for Facebook™
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
 Package: `dist/fb-feed-cleaner-<version>-store.zip` (built with `./package.sh --store`)
