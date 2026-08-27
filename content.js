@@ -1428,7 +1428,73 @@
     window.removeEventListener("popstate", scheduleScan);
   }
 
+  /**
+   * Diagnostics that the gate depends on, mirroring the YouTube build.
+   *
+   * Running the gate on this extension on 2026-08-27 stopped at step one:
+   * there was no way to read the running version from the page, and no
+   * control arm, so two of the four steps could not be performed at all.
+   * Both are a few lines and both end a class of error:
+   *
+   *   data-fbfc-version    which build is actually live — an unpacked
+   *                        extension serves old code until Reload is pressed
+   *   data-fbfc-tabhidden  whether the tab was backgrounded; Facebook does
+   *                        not hydrate the feed in a hidden tab, so any count
+   *                        taken there is void, exactly as on YouTube
+   *   ?fbfcoff=1           disables the extension for one page load, so the
+   *                        same feed can be read with it on and off
+   *
+   * The visibility name is deliberately NOT data-fbfc-hidden — that attribute
+   * already marks individual hidden posts, and reusing it would make the two
+   * impossible to tell apart in a report.
+   */
+  function stampDiagnostics() {
+    try {
+      const root = document.documentElement;
+      root.setAttribute("data-fbfc-version", VERSION);
+      const mark = () => {
+        try {
+          if (document.visibilityState === "hidden") {
+            root.setAttribute("data-fbfc-tabhidden", "1");
+          } else if (!root.hasAttribute("data-fbfc-tabhidden")) {
+            root.setAttribute("data-fbfc-tabhidden", "0");
+          }
+        } catch {
+          /* reporting only */
+        }
+      };
+      mark();
+      document.addEventListener("visibilitychange", mark);
+    } catch {
+      /* diagnostics must never break the feed */
+    }
+  }
+
+  function bypassed() {
+    try {
+      return location.search.indexOf("fbfcoff=1") !== -1;
+    } catch {
+      return false;
+    }
+  }
+
   function start() {
+    stampDiagnostics();
+
+    // A REAL bypass: nothing below is installed, so the control arm is the
+    // page as Facebook serves it. The YouTube build shipped a bypass that
+    // only half worked for several versions, and every conclusion drawn from
+    // it was comparing the extension against itself.
+    if (bypassed()) {
+      try {
+        document.documentElement.setAttribute("data-fbfc-bypassed", "1");
+      } catch {
+        /* reporting only */
+      }
+      console.log(`[FB Feed Cleaner ${VERSION}] bypassed for this page load`);
+      return;
+    }
+
     console.log(`[FB Feed Cleaner ${VERSION}] active on ${location.pathname}`);
     safeScan();
     // Give the feed time to hydrate before judging whether we did anything.
