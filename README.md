@@ -107,6 +107,12 @@ throwing when the extension is reloaded under an open tab.
 
 All names and content in the test fixtures are fictional.
 
+## Support
+
+This is free and has no ads, no tracking and no accounts. If it saves you some
+irritation, you can [buy me a coffee](https://buymeacoffee.com/kingdogma23).
+It is an ordinary link — nothing is sent anywhere unless you click it.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
