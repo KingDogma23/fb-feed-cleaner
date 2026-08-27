@@ -38,7 +38,7 @@ Include verbatim at the end of the store description:
 
 > Facebook™ is a trademark of Meta Platforms, Inc. This extension is an
 > independent project and is not affiliated with, endorsed by or
-> sponsored by Meta Platforms, Inc..
+> sponsored by Meta Platforms, Inc.
 
 ## Category
 
