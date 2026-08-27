@@ -7,23 +7,25 @@
       :root {
         color-scheme: light dark;
         --bg: #ffffff;
-        --card: #f4f7f5;
-        --fg: #14201b;
-        --muted: #62726a;
-        --line: #dfe7e2;
-        --brand: #1f8f6a;
+        --card: #f7f5f2;
+        --fg: #201b14;
+        --muted: #726a5f;
+        --line: #e7e1d8;
+        /* Darker than the icon's amber on purpose: this value is also used as
+           TEXT on white, where #e0a341 would fail contrast. */
+        --brand: #9c6612;
         --brand-ink: #ffffff;
-        --off: #b9c4bf;
+        --off: #c4bdb2;
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #141816;
-          --card: #1c221f;
-          --fg: #e8efea;
-          --muted: #97a49d;
-          --line: #2a322e;
-          --brand: #35b98c;
-          --off: #3d4642;
+          --bg: #1a1820;
+          --card: #221f2a;
+          --fg: #eae7f0;
+          --muted: #9e97ad;
+          --line: #302c3a;
+          --brand: #e0a341;
+          --off: #45404f;
         }
       }
       * { box-sizing: border-box; }

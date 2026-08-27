@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quite for Facebook",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "Cleans up your Facebook\u2122 feed: hides suggested posts, suggested groups and sponsored posts.",
   "permissions": [
     "storage"
