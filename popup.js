@@ -72,7 +72,7 @@ function render(d) {
     .join("\n");
 
   lastReport = [
-    `Quiet for Facebook v${d.version}  (page ${d.url})`,
+    `Quite for Facebook v${d.version}  (page ${d.url})`,
     `all time: ${lt.sponsored} ads, ${lt.follow} suggested posts, ${lt.join} groups`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
     `hidden this page: ${d.hidden}${rules ? "  [" + rules + "]" : ""}`,

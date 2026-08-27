@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Quiet for Facebook",
-  "version": "2.4.1",
+  "name": "Quite for Facebook",
+  "version": "2.4.2",
   "description": "Cleans up your Facebook feed: hides suggested posts, suggested groups and sponsored posts.",
   "permissions": [
     "storage"
@@ -26,7 +26,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Quiet for Facebook"
+    "default_title": "Quite for Facebook"
   },
   "icons": {
     "16": "icons/icon16.png",

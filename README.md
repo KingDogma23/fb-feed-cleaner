@@ -1,4 +1,4 @@
-# Quiet for Facebook
+# Quite for Facebook
 
 A Chrome extension that strips the clutter out of your Facebook news feed.
 
