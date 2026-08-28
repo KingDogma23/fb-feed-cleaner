@@ -40,29 +40,50 @@ async function tell(message) {
 
 const compact = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : (n || 0).toLocaleString());
 
-function render(d) {
+/**
+ * All-time totals, read from storage rather than from the page.
+ *
+ * The counters used to come only from the content script, so opening the popup
+ * on any tab that is not Facebook rendered 0 / 0 / 0 — the numbers are sitting
+ * in storage the whole time, but the panel showed nothing and looked broken.
+ * Reported by Martin on 2026-08-28, having opened it on a BBC tab.
+ */
+async function storedLifetime() {
+  if (!alive()) return null;
+  try {
+    const got = await chrome.storage.local.get({ quietLifetime: null });
+    return got.quietLifetime;
+  } catch {
+    return null;
+  }
+}
+
+function render(d, stored) {
   const on = $("enabled").checked;
   $("stateText").textContent = on ? "Protection on" : "Protection off";
   $("stateSub").textContent = on
     ? "Feed clutter hidden as it loads"
     : "Facebook is showing you everything";
 
+  // Totals first, and from whichever source has them: they are all-time figures
+  // and have nothing to do with which tab happens to be open.
+  const lt = d?.lifetime || stored || { sponsored: 0, follow: 0, join: 0 };
+  $("sAds").textContent = compact(lt.sponsored);
+  $("sSug").textContent = compact(lt.follow);
+  $("sGrp").textContent = compact(lt.join);
+
   if (!d) {
     $("ver").textContent = "";
     $("diag").textContent =
-      "Not running on this tab.\n\nOpen a facebook.com tab, or reload it — a " +
-      "content script only attaches at page load. If you just updated the " +
-      "extension, reload it on chrome://extensions first.";
+      "The totals above are all-time, and this tab is not Facebook.\n\n" +
+      "Open a facebook.com tab to see what is being hidden right now. If you " +
+      "are on Facebook and still seeing this, reload the page — a content " +
+      "script only attaches at page load.";
     lastReport = $("diag").textContent;
     return;
   }
 
   $("ver").textContent = "v" + d.version;
-
-  const lt = d.lifetime || { sponsored: 0, follow: 0, join: 0 };
-  $("sAds").textContent = compact(lt.sponsored);
-  $("sSug").textContent = compact(lt.follow);
-  $("sGrp").textContent = compact(lt.join);
 
   const rules = Object.entries(d.byRule || {}).map(([k, v]) => `${k}=${v}`).join(" ");
   const reasons = Object.entries(d.reasons || {})
@@ -91,7 +112,8 @@ function render(d) {
 }
 
 async function refresh() {
-  render(await tell({ type: "diagnostics" }));
+  const [live, stored] = await Promise.all([tell({ type: "diagnostics" }), storedLifetime()]);
+  render(live, stored);
 }
 
 function applyStored(stored) {
