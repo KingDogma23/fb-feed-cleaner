@@ -1,7 +1,12 @@
 # Chrome Web Store submission — Quite for Facebook™
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
+Source: **github.com/KingDogma23/quite-for-facebook**
 Package: `dist/fb-feed-cleaner-<version>-store.zip` (built with `./package.sh --store`)
+
+> The zip is named from the working directory, which is still `fb-feed-cleaner` while
+> the repository is `quite-for-facebook`. Harmless, but do not let it read as a
+> different extension from the one being submitted.
 
 ## Summary (132 characters max)
 
@@ -72,11 +77,20 @@ Select: **does not collect or use user data.**
 
 - Screenshots, 1280x800, in `store/screenshots/`:
   - `01-a-quieter-feed.png`
-  - `02-nothing-hidden.png`
+  - `02-hidden-as-it-loads.png`
+  - `03-nothing-hidden.png`
 - 128x128 icon — already in the package
-- Optional 440x280 small promo tile — not made
+- `store/promo-tile-440x280.png`
+- `store/marquee-1400x560.png`
 
-The screenshots show the real popup, rendered from the shipped popup.html with
-the extension's own default options ticked. The counters read zero because
-that is what a fresh install shows; inventing numbers for a store listing
-would be a lie told to everyone who reads it.
+All three are drawn from the same generator as the other Quite Apps listings
+(`tools/make-shots.py` in the website project), so the three extensions present
+as one publisher. Each shows the popup in a different real state — the default
+options, everything on, and the pared-back set — rather than the same picture
+three times.
+
+Earlier versions of these screenshots showed a fresh install's zeros. The
+counters now read 243 ads hidden / 394 suggestions / 77 groups, read directly
+from `chrome.storage` in the author's Chrome profile on 2026-08-29. They
+replace 213 / 313 / 65, which were real when captured but had since moved on —
+the counters keep running. Not invented for the listing.
