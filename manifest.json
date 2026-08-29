@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Quite for Facebook™",
-  "version": "2.5.5",
-  "description": "Cleans up your Facebook™ feed: hides suggested posts, suggested groups and sponsored posts.",
+  "name": "Quite for Facebook™ — hide ads, suggested posts and groups",
+  "short_name": "Quite for Facebook™",
+  "version": "2.6.0",
+  "description": "Cleans up the Facebook feed: hides ads, suggested posts, suggested groups and the Sponsored column. No accounts, no tracking.",
   "permissions": [
     "storage"
   ],
