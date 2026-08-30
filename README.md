@@ -18,7 +18,7 @@ moment you switch it off.
 
 ## Install
 
-Not on the Chrome Web Store, so it installs unpacked:
+To run it from source, install it unpacked:
 
 1. Download the latest release and unzip it. You need the **folder**.
    Keep it somewhere permanent — if you move or delete it, the extension stops working.
@@ -76,7 +76,10 @@ into an issue and it's usually enough to pin the problem immediately.
 ## Privacy
 
 - Runs **only** on `facebook.com`. It has no permission to access any other site.
-- Sends nothing anywhere. No server, no analytics, no account, no tracking.
+- No server, no analytics, no account, no tracking. Nothing is sent to us.
+  It stores your checkbox settings and a count of what it has hidden. Settings
+  use Chrome's own extension-settings sync, so if you have Chrome sync switched
+  on they travel with your Chrome profile, the same as any extension's settings.
 - The only thing stored is your checkbox settings.
 - Hides posts with a "don't display this" style — it never clicks anything,
   never blocks or unfollows for you, and makes no change to your account.

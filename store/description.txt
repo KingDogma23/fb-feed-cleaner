@@ -7,7 +7,7 @@ Quite for Facebook removes the clutter from your Facebook feed and does nothing 
 
 Two options worth knowing about: Strict mode only hides posts that are also marked "Suggested for you", and a placeholder option leaves a small strip with a Show button instead of removing a post outright, so you can always see what was hidden and put it back.
 
-It runs only on facebook.com. It has no account, no server and no analytics, and it never sends anything anywhere. The only thing it stores is which of the checkboxes you have ticked.
+It runs only on facebook.com. It has no account, no server and no analytics, and nothing is sent to us. It stores the checkboxes you have ticked and a running count of what it has hidden. Settings use Chrome's own extension-settings sync, so with Chrome sync switched on they travel with your Chrome profile, as any extension's settings do.
 
 Facebook changes its markup regularly. When that happens some posts can start getting through until the extension is updated — it is built to fail towards "clutter gets through" rather than towards hiding something you wanted.
 

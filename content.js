@@ -132,6 +132,10 @@
    */
   const LIFETIME_KEY = "quietLifetime";
   let lifetime = { follow: 0, join: 0, sponsored: 0, since: null };
+  // Most posts of each kind hidden at once during THIS page session. Lifetime
+  // only ever grows by the amount this exceeds its previous value, which makes
+  // re-hiding after unhideAll() free. See hide().
+  const sessionPeak = { follow: 0, join: 0, sponsored: 0 };
   let lifetimeDirty = false;
 
   /**
@@ -1140,10 +1144,30 @@
 
   // ------------------------------------------------------------ hide/unhide
 
+  // What was removed, in the words the store listing uses. Two things were
+  // wrong with the string this replaces:
+  //
+  //   1. It printed the internal rule id — `Hidden suggested post ("follow")`.
+  //      "follow" is how the post was RECOGNISED, not what it was, and naming
+  //      the mechanism on screen is the same thing the README rule forbids.
+  //   2. Its ternary called everything that was not "sponsored" a "suggested
+  //      post", so every suggested GROUP was mislabelled. The rule ids are
+  //      exactly follow / join / sponsored (see RULES at the top of this file),
+  //      and join is a group.
+  //
+  // The id stays reachable for diagnosis via the title attribute and
+  // data-fbfc-reason on the post itself; it just is not shown to the reader.
+  const PLACEHOLDER_LABEL = {
+    sponsored: "Hidden ad",
+    follow: "Hidden suggested post",
+    join: "Hidden suggested group",
+  };
+
   function placeholderFor(target, reason) {
     const bar = document.createElement("div");
     bar.className = "fbfc-placeholder";
-    bar.textContent = `Hidden ${reason === "sponsored" ? "ad" : "suggested post"} ("${reason}")`;
+    bar.textContent = PLACEHOLDER_LABEL[reason] || "Hidden suggestion";
+    bar.title = reason;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = "Show";
@@ -1152,8 +1176,39 @@
     return bar;
   }
 
+  // Landmark roles exist once, at page-structure level. A single post never
+  // contains one. If the upward walk has climbed far enough to swallow a
+  // landmark it has gone past the post, and hiding the result blanks the page.
+  //
+  // postContainerFor() stops at a real post boundary only via looksLikeFeedList(),
+  // which needs >=3 tall siblings — a condition that CANNOT hold on a single-post
+  // permalink, which is exactly where a shared link lands. Once hidden the damage
+  // is permanent: everything inside a display:none subtree measures zero, so every
+  // later scan rejects it as "not rendered" and it never comes back.
+  //
+  // So hide() refuses rather than trusting the walk. Failing closed is always
+  // right here — a missed ad costs the viewer nothing; a blank Facebook costs
+  // them the site. refusedOverreach is published in diagnostics() so that if this
+  // guard ever starts firing broadly (which would mean hiding nothing at all) it
+  // says so out loud instead of silently disabling the extension.
+  const LANDMARK_SEL =
+    '[role="feed"], [role="main"], [role="banner"], [role="navigation"], [role="complementary"]';
+  let refusedOverreach = 0;
+
+  function swallowsPageStructure(target) {
+    try {
+      return target.matches(LANDMARK_SEL) || !!target.querySelector(LANDMARK_SEL);
+    } catch {
+      return false; // a selector failure must not block ordinary hiding
+    }
+  }
+
   function hide(target, reason) {
     if (hidden.has(target)) return;
+    if (swallowsPageStructure(target)) {
+      refusedOverreach++;
+      return;
+    }
     // setAttribute rather than dataset so the write is observable from outside
     // (test/mock-feed.html asserts that no measurement happens after the first
     // write in a scan — that ordering is what keeps the feed from flickering).
@@ -1166,9 +1221,29 @@
     }
     hidden.add(target);
     sessionCount++;
+    // Count by page-session HIGH-WATER MARK per reason, never per hide() call.
+    //
+    // Any settings change calls unhideAll(), which clears `hidden`; the rescan
+    // then re-hides the same posts and the all-time totals used to grow by the
+    // whole visible page — so toggling a cosmetic checkbox like `badge`
+    // inflated "ads hidden" without bound.
+    //
+    // Marking the element (target._fbfcCounted) was tried first and is NOT
+    // enough: React hands back different DOM nodes across a rescan, so the mark
+    // dies with the old node. Measured on live Facebook 2026-08-30 — two
+    // cosmetic toggles produced 6 counter increments against 1 genuinely new
+    // hide, i.e. 5 re-counts. The peak survives because it is keyed on the
+    // reason, not on any node.
     if (reason in lifetime) {
-      lifetime[reason]++;
-      lifetimeDirty = true;
+      let live = 0;
+      for (const t of hidden) {
+        if (t.getAttribute("data-fbfc-reason") === reason) live++;
+      }
+      if (live > sessionPeak[reason]) {
+        lifetime[reason] += live - sessionPeak[reason];
+        sessionPeak[reason] = live;
+        lifetimeDirty = true;
+      }
     }
   }
 
@@ -1552,6 +1627,15 @@
     return {
       version: VERSION,
       url: location.pathname,
+      // The message listener is registered outside start(), so a page running
+      // under ?fbfcoff=1 still answers a diagnostics request — previously with a
+      // payload identical to a completely broken build. Every other number here
+      // is meaningless when this is set, so it travels with the reading.
+      bypassed: document.documentElement.hasAttribute("data-fbfc-bypassed"),
+      // CLAUDE.md requires the tab-visibility flag to accompany every reading:
+      // a backgrounded tab reports zero-size rects, which voids the lot.
+      tabHidden: document.documentElement.getAttribute("data-fbfc-tabhidden"),
+      refusedOverreach,
       lifetime: { ...lifetime },
       settings: { ...settings },
       hidden: hidden.size,

@@ -30,8 +30,10 @@ a Show button instead of removing a post outright, so you can always see what
 was hidden and put it back.
 
 It runs only on facebook.com. It has no account, no server and no analytics,
-and it never sends anything anywhere. The only thing it stores is which of the
-checkboxes you have ticked.
+and nothing is sent to us. It stores the checkboxes you have ticked and a
+running count of what it has hidden. Settings use Chrome's own extension-
+settings sync, so with Chrome sync switched on they travel with your Chrome
+profile, as any extension's settings do.
 
 Facebook changes its markup regularly. When that happens some posts can start
 getting through until the extension is updated — it is built to fail towards
@@ -77,7 +79,7 @@ Select: **does not collect or use user data.**
 
 - Screenshots, 1280x800, in `store/screenshots/`:
   - `01-a-quieter-feed.png`
-  - `02-hidden-as-it-loads.png`
+  - `02-ads-and-suggestions.png`
   - `03-nothing-hidden.png`
 - 128x128 icon — already in the package
 - `store/promo-tile-440x280.png`
