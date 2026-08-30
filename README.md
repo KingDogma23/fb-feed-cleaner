@@ -80,7 +80,6 @@ into an issue and it's usually enough to pin the problem immediately.
   It stores your checkbox settings and a count of what it has hidden. Settings
   use Chrome's own extension-settings sync, so if you have Chrome sync switched
   on they travel with your Chrome profile, the same as any extension's settings.
-- The only thing stored is your checkbox settings.
 - Hides posts with a "don't display this" style — it never clicks anything,
   never blocks or unfollows for you, and makes no change to your account.
 
