@@ -85,14 +85,23 @@ Select: **does not collect or use user data.**
 - `store/promo-tile-440x280.png`
 - `store/marquee-1400x560.png`
 
-All three are drawn from the same generator as the other Quite Apps listings
+01 and 03 come from the same generator as the other Quite Apps listings
 (`tools/make-shots.py` in the website project), so the three extensions present
-as one publisher. Each shows the popup in a different real state — the default
-options, everything on, and the pared-back set — rather than the same picture
-three times.
+as one publisher.
 
-Earlier versions of these screenshots showed a fresh install's zeros. The
-counters now read 243 ads hidden / 394 suggestions / 77 groups, read directly
-from `chrome.storage` in the author's Chrome profile on 2026-08-29. They
-replace 213 / 313 / 65, which were real when captured but had since moved on —
-the counters keep running. Not invented for the listing.
+02 was regenerated on 2026-08-30 and is NOT from that generator: it is an HTML
+render wrapping a live screenshot of the real 2.6.1 popup, so the panel in it is
+the actual product rather than a mock. It replaces `02-hidden-as-it-loads.png`,
+whose headline ("Hidden as it loads, not after.") and first bullet ("Posts never
+paint, so nothing flickers away") were a timing claim the code does not deliver
+— the harness records a newly arrived ad taking about 1.5s, with the post
+painting at full height first, and deliberately does not assert it because it is
+a known-unfixed defect. If 01 and 03 are ever regenerated, 02 will need
+re-rendering from `store/screenshot-02-source.html` (open it at exactly
+1280x800, device scale 1, and capture) to keep the set consistent.
+
+The counters visible in 02 read 63 / 42 / 1, taken from a clean test profile on
+2026-08-30. The previous set showed 243 / 394 / 77, which were real reads but of
+a counter that re-counted every visible post on any settings change — a bug
+fixed in 2.6.1, which means those figures were inflated by an unknown factor.
+Nothing here is invented for the listing, but do not quote the old numbers.
