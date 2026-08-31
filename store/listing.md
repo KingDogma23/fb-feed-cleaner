@@ -2,6 +2,7 @@
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
 Source: **github.com/KingDogma23/quite-for-facebook**
+Store:  **https://chromewebstore.google.com/detail/quite-for-facebook/mmkkijoeabmdogijjnkglkmeckhdhedl**  (published 2026-08-30)
 Package: `dist/fb-feed-cleaner-<version>-store.zip` (built with `./package.sh --store`)
 
 > The zip is named from the working directory, which is still `fb-feed-cleaner` while
