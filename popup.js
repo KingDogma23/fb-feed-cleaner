@@ -99,7 +99,31 @@ function render(d, stored) {
     .map(([why, n]) => `  ${n} x ${why}`)
     .join("\n");
 
+  // WHICH ARM THIS IS, first line, always — the same "ARM:" marker the other
+  // three extensions use, so a pasted readout always announces itself and the
+  // four reports can be read the same way. The loud void lines below are kept:
+  // when either is set, every number under them is meaningless.
+  // The build this popup file came from. Chrome serves popup.js fresh from disk
+  // while the content script is whatever was injected at page load, so the two
+  // disagree after a reload — and a report from the older build looks exactly
+  // like a current one. That just happened: a 2.6.7 report was read as though
+  // it were 2.6.8, and nothing in it said otherwise.
+  const POPUP_VERSION = "2.6.10";
+  const skew = d.version && d.version !== POPUP_VERSION
+    ? `\n!! STALE PAGE: this tab is running content script v${d.version} but the ` +
+      `popup is v${POPUP_VERSION}. Reload the extension AND refresh the Facebook ` +
+      `tab, then take the reading again — anything the older build does not send ` +
+      `will simply be missing from this report.`
+    : "";
+
+  const arm = d.bypassed
+    ? "ARM: BYPASSED (?fbfcoff=1) — hiding nothing"
+    : !d.settings?.enabled
+      ? "ARM: OFF via the popup toggle — hiding nothing"
+      : "ARM: ACTIVE — hiding";
+
   lastReport = [
+    arm + skew,
     `Quite for Facebook v${d.version}  (page ${d.url})`,
     // First and loud: when either of these is set every number below is void,
     // and a report that omits them is indistinguishable from a broken build.
@@ -109,7 +133,20 @@ function render(d, stored) {
     `all time: ${lt.sponsored} ads, ${lt.follow} suggested posts, ${lt.join} groups`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
     `hidden this page: ${d.hidden}${rules ? "  [" + rules + "]" : ""}`,
-    `labels seen: ${d.labelsSeen} (${d.labelsByRender ?? 0} needed de-obfuscating)`,
+    d.anchor
+      ? `scroll anchoring: page=${d.anchor.scroller} feed=${d.anchor.feed}` +
+        `   (auto = collapsing above you is invisible; none = it shifts the page)\n` +
+        `hidden posts right now: ${d.anchor.hiddenAboveViewport} above you, ` +
+        `${d.anchor.hiddenInViewport} on screen   scan debounce ${d.anchor.debounceMs}ms`
+      : null,
+    `labels seen: ${d.labelsSeen} this scan (${d.labelsByRender ?? 0} de-obfuscated)`,
+    `labels seen THIS SESSION: ${d.sessionLabels ?? "no reading"} across ` +
+      `${d.sessionScans ?? "no reading"} scans` +
+      (d.sessionScans === 0
+        ? "   <-- the scan has never run; this is not 'no ads found'"
+        : d.sessionLabels === 0
+          ? "   <-- scans ran and found NO labels at all: matching is broken"
+          : ""),
     // Session totals, not the per-scan tally. `tally` is reassigned at the top
     // of every scan and refresh() does not trigger one, so this line used to
     // report whatever the last 60ms mutation-driven pass happened to leave —

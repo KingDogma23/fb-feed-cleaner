@@ -5,7 +5,7 @@ Quite for Facebook removes the clutter from your Facebook feed and does nothing 
 - Suggested groups can be hidden too.
 - The Sponsored column on the right, above your contacts, is hidden.
 
-Two options worth knowing about: Strict mode only hides posts that are also marked "Suggested for you", and a placeholder option leaves a small strip with a Show button instead of removing a post outright, so you can always see what was hidden and put it back.
+Two options worth knowing about: Cautious mode hides fewer posts rather than more — suggested posts and groups are only removed when they are also marked "Suggested for you" by Facebook — and a placeholder option leaves a small strip with a Show button instead of removing a post outright, so you can always see what was hidden and put it back.
 
 It runs only on facebook.com. It has no account, no server and no analytics, and nothing is sent to us. It stores the checkboxes you have ticked and a running count of what it has hidden. Settings use Chrome's own extension-settings sync, so with Chrome sync switched on they travel with your Chrome profile, as any extension's settings do.
 

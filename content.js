@@ -53,6 +53,28 @@
       strictable: true,
     },
     {
+      // Facebook's own "Suggested for you" line, which sits in the meta row
+      // under the author name and is NOT clickable — so the header-line mode
+      // used by `follow` can never match it.
+      //
+      // Added 2026-09-01. Until then this string existed only in
+      // SUGGESTED_MARKERS, as the gate for cautious mode, and no rule ever
+      // hid anything because of it. A suggested post with no Follow control
+      // and no Sponsored label matched nothing and went straight through —
+      // confirmed from a live feed, where "Propaganda (Band) | Suggested for
+      // you" sat in the unmatched list with the label plainly visible.
+      //
+      // strictable:false on purpose. Cautious mode exists to hide only posts
+      // Facebook itself marks "Suggested for you"; suppressing this rule under
+      // it would mean cautious mode hid nothing at all.
+      id: "suggested",
+      setting: "hideFollow", // the same "Hide suggested posts" checkbox
+      counter: "follow", // reported under "suggested posts"
+      labels: ["Suggested for you", "Suggested for You", "Suggested post", "Suggested Post"],
+      mode: "header-zone",
+      strictable: false,
+    },
+    {
       id: "sponsored",
       setting: "hideSponsored",
       labels: ["Sponsored", "Ad", "Paid partnership", "Suggested Post"],
@@ -77,6 +99,11 @@
     hideJoin: false,
     hideRail: true, // the right-hand "Sponsored" column
     hideSponsored: true,
+    // Storage key stays `strict` on purpose: renaming it would silently reset
+    // the setting for every existing user. The USER-FACING name is "Cautious
+    // mode", changed 2026-09-01 because "Strict" reads as "block harder" and
+    // does the exact opposite — it cost an evening hunting a bug that was this
+    // checkbox doing precisely what its small print promised.
     strict: false, // also require a "Suggested for you"-style marker
     placeholder: false, // leave a slim bar instead of removing outright
     // On-page status readout. Off by default — it is a diagnostic, not
@@ -115,13 +142,34 @@
 
   // From the manifest, so the reported version can never drift from the
   // installed one — this file and manifest.json had already diverged once.
-  const VERSION = (() => {
-    try {
-      return chrome.runtime.getManifest().version;
-    } catch {
-      return "orphaned";
-    }
-  })();
+  // A LITERAL, not chrome.runtime.getManifest().
+  //
+  // getManifest() returns the version of the LOADED extension, not of the code
+  // executing. Reload the extension without refreshing the page and this old
+  // content script reports the NEW version while running the old logic — the
+  // report lies about precisely the thing CLAUDE.md's first gate exists to
+  // check. package.sh refuses to build if this disagrees with the manifest.
+  const VERSION = "2.6.10";
+
+  /**
+   * The build, plus whether this copy is still attached to the extension.
+   *
+   * VERSION was previously read from chrome.runtime.getManifest(), which
+   * returns the version of the LOADED extension rather than of the code
+   * executing — so after an extension reload an old content script reports the
+   * NEW version while running the old logic, which is precisely the lie the
+   * "confirm the running build" gate exists to catch. It is now a literal, and
+   * package.sh refuses to build if it disagrees with the manifest.
+   *
+   * That change did cost something: the old code returned "orphaned" when
+   * getManifest() threw, which was a real signal that this copy had lost its
+   * extension context. This restores it without restoring the lie — the build
+   * is always the truth about the code, and the orphan state is reported
+   * alongside it rather than in place of it.
+   */
+  function buildLabel() {
+    return contextAlive() ? VERSION : VERSION + " (orphaned)";
+  }
 
   /**
    * Lifetime totals, persisted to chrome.storage.local.
@@ -200,7 +248,7 @@
   // Session totals. The per-scan tally cannot answer "has this ever worked?" —
   // with a 1.5s cooldown and a 60ms scan interval, almost every snapshot shows
   // the sweep doing nothing, which reads as broken when it is merely idle.
-  const session = { sweeps: 0, sweepMatches: 0, labels: 0, feedCells: 0, samples: [] };
+  const session = { sweeps: 0, sweepMatches: 0, labels: 0, feedCells: 0, scans: 0, samples: [] };
 
   /**
    * Capture what a post's meta row actually says when the sweep finds no label
@@ -872,11 +920,6 @@
   const AD_SWEEP_COOLDOWN_MS = 1500;
   let adSweptAt = new WeakMap();
 
-  // How many consecutive out-of-zone elements end the header sweep. Document
-  // order tracks visual order closely enough that a run this long means the
-  // header is behind us.
-  const HEADER_SWEEP_GIVEUP = 20;
-
   /**
    * Find a label in this post's header by what it *renders*, not what its text
    * nodes say. Only used for the ad rule, and only over the header strip, since
@@ -1324,6 +1367,7 @@
     // ---- 1. collect (reads) ----
     const found = collectLabels(root, active);
     tally = { labels: found.length, rejected: 0, reasons: {} };
+    session.scans++;
     session.labels = Math.max(session.labels, found.length);
 
     // ---- 2. decide (reads) ----
@@ -1349,7 +1393,7 @@
         continue;
       }
       if (settings.strict && rule.strictable && !headerHasSuggestedMarker(post)) {
-        noteRejection(text, "no 'Suggested for you' marker (strict mode)", el);
+        noteRejection(text, "no 'Suggested for you' marker (cautious mode)", el);
         continue;
       }
 
@@ -1439,7 +1483,11 @@
     const railBlocks = planRail();
 
     // ---- 3. mutate (writes) ----
-    for (const { post, rule } of toHide) hide(post, rule.id);
+    // rule.counter lets a rule report under an existing lifetime key. Without
+    // it a new rule id would write lifetime[undefined] and the count would
+    // silently vanish — a counter that cannot report is a feature that gets
+    // deleted, per the working rules for this directory.
+    for (const { post, rule } of toHide) hide(post, rule.counter || rule.id);
     for (const block of railBlocks) hide(block, "sponsored");
     updateBadge();
   }
@@ -1526,7 +1574,7 @@
   function stampDiagnostics() {
     try {
       const root = document.documentElement;
-      root.setAttribute("data-fbfc-version", VERSION);
+      root.setAttribute("data-fbfc-version", buildLabel());
       const mark = () => {
         try {
           if (document.visibilityState === "hidden") {
@@ -1570,7 +1618,7 @@
       return;
     }
 
-    console.log(`[FB Feed Cleaner ${VERSION}] active on ${location.pathname}`);
+    console.log(`[FB Feed Cleaner ${buildLabel()}] active on ${location.pathname}`);
     safeScan();
     // Give the feed time to hydrate before judging whether we did anything.
     setTimeout(report, 6000);
@@ -1632,6 +1680,48 @@
       // payload identical to a completely broken build. Every other number here
       // is meaningless when this is set, so it travels with the reading.
       bypassed: document.documentElement.hasAttribute("data-fbfc-bypassed"),
+
+      // WHY THE FEED APPEARS TO REDRAW ON THE FIRST SCROLL. Two candidates,
+      // measured rather than argued about:
+      //   1. overflow-anchor. Instagram's feed is `auto`, so collapsing a post
+      //      ABOVE the viewport is compensated and the reader sees nothing
+      //      (ig-feed-cleaner/test/anchor-probe.html: scrollY -626, reference
+      //      moved 0). If Facebook's scroller is `none`, that same collapse
+      //      shifts everything on screen — and this extension has no
+      //      above-viewport guard at all, unlike Instagram's.
+      //   2. how many collapse at once, at a 60ms debounce, mid-scroll.
+      // The live report showed feeds=0, so there is no [role="feed"] here and
+      // the scroller has to be found by walking up from a real post.
+      anchor: (() => {
+        try {
+          const se = document.scrollingElement || document.documentElement;
+          const post = document.querySelector("[data-fbfc-hidden]") ||
+                       document.querySelector('[role="article"]');
+          let inner = null;
+          for (let el = post; el && el !== document.body; el = el.parentElement) {
+            const cs = getComputedStyle(el);
+            if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 40) {
+              inner = el;
+              break;
+            }
+          }
+          const all = [...document.querySelectorAll("[data-fbfc-hidden]")];
+          return {
+            scroller: getComputedStyle(se).overflowAnchor,
+            feed: getComputedStyle(inner || se).overflowAnchor,
+            feedIs: inner ? (inner.getAttribute("role") || inner.tagName.toLowerCase())
+                          : "page (no inner scroller found)",
+            hiddenAboveViewport: all.filter((el) => el.getBoundingClientRect().bottom < 0).length,
+            hiddenInViewport: all.filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.bottom >= 0 && r.top <= window.innerHeight;
+            }).length,
+            debounceMs: SCAN_DEBOUNCE_MS,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      })(),
       // CLAUDE.md requires the tab-visibility flag to accompany every reading:
       // a backgrounded tab reports zero-size rects, which voids the lot.
       tabHidden: document.documentElement.getAttribute("data-fbfc-tabhidden"),
@@ -1642,6 +1732,13 @@
       byRule,
       labelsSeen: tally.labels,
       labelsByRender: tally.byRender || 0,
+      // Session-cumulative, because labelsSeen is per-scan and `tally` is reset
+      // at the top of every scan while opening the popup does not trigger one.
+      // A per-scan 0 means "the last mutation pass found nothing", which is not
+      // the same as "this has never worked" — and on 2026-09-01 that ambiguity
+      // was the whole question and the report could not answer it.
+      sessionLabels: session.labels,
+      sessionScans: session.scans || 0,
       session: { ...session },
       render: {
         examined: tally.renderExamined || 0,
@@ -1678,6 +1775,11 @@
       safeScan();
       respond({ ok: true, total: sessionCount });
     }
-    return true;
+    // Every branch above responds SYNCHRONOUSLY, so returning true — which
+    // means "a response is coming later" — left Chrome holding a channel that
+    // nothing ever answered, and it logged "the message channel closed before a
+    // response was received" on every popup open. That is what fills the Errors
+    // button on chrome://extensions.
+    return false;
   });
 })();

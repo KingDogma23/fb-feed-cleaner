@@ -215,6 +215,7 @@
         </div>
       </div>
 
+  
       <!-- 12: the shorter "Ad" variant Facebook also uses. -->
       <div>
         <div class="post" data-case="12" data-expect="hide">
@@ -953,6 +954,59 @@
           <div style="height:200px;background:#dfe3e6;border-radius:6px;margin-top:8px"></div>
         </div>
       </div>
+
+      <!-- 47: THE SHAPE THAT LEAKED. "Suggested for you" sits in the meta row
+           under the author name, and there is NO Follow or Join control at all,
+           so the header-line rules that key on a clickable pill can never match
+           it. Confirmed live on 2026-09-01: "Propaganda (Band) · Suggested for
+           you" sat in the unmatched list with the label plainly visible, and
+           went straight through for the whole of 2.6.5. The `suggested` rule in
+           content.js exists for exactly this, and until now nothing tested it.
+
+           The author is marked with <h2>, as Facebook marks it and as case 11
+           does. That is not decoration: header-zone qualifies a label by finding
+           the author heading above it, so a fixture using a plain <span> tests a
+           DOM shape Facebook never renders and fails for the wrong reason. -->
+      <div>
+        <div class="post" role="article" data-case="47" data-expect="hide">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Propaganda (Band)</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b">
+                <span>Suggested for you</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">A page you do not follow, pushed into the feed.</div>
+        </div>
+      </div>
+
+      <!-- 48: the control for 47 — the identical post WITHOUT the label. If
+           this one is ever hidden, the rule is matching on the shape rather
+           than on the label and is hiding ordinary posts. -->
+      <div>
+        <div class="post" role="article" data-case="48" data-expect="keep">
+          <div class="hdr">
+            <div class="avatar"></div>
+            <div>
+              <span>
+                <h2 style="display:inline;margin:0;font-size:15px">
+                  <span><span><a role="link" href="#">Propaganda (Band)</a></span></span>
+                </h2>
+              </span>
+              <div style="font-size:12px;color:#65676b"><span>3h</span></div>
+            </div>
+          </div>
+          <div class="body">A page you do not follow, pushed into the feed.</div>
+        </div>
+      </div>
+
+    </div>
     </div>
     </div>
 
@@ -1057,6 +1111,21 @@
       };
       const realSetAttr = Element.prototype.setAttribute;
       Element.prototype.setAttribute = function (name, value) {
+        // KNOWN FALSE ALARM, 2026-09-01. This traces EVERY data-fbfc-*
+        // attribute, which includes stampDiagnostics()'s data-fbfc-version and
+        // data-fbfc-tabhidden on documentElement — reporting only, no layout
+        // cost. The version stamp lands at boot ~59ms in, so the boot scan's
+        // reads after it are counted as "measured after writing" and the
+        // assertion reports thrash that is not happening. It cost two wrong
+        // fixes to the extension before the instrument was checked.
+        //
+        // NOT narrowed to data-fbfc-hidden/reason, because doing that was tried
+        // and made the assertion unable to fail AT ALL: a build with a
+        // deliberate getBoundingClientRect() straight after hide() still
+        // reported "no layout thrash". The likely cause is that this patches
+        // Element.prototype in the PAGE world while the content script runs in
+        // an isolated world with its own prototypes — so what this actually
+        // measures is unclear. Understand that before touching it again.
         if (String(name).startsWith("data-fbfc-")) {
           trace.push({ t: performance.now(), kind: "write" });
         }

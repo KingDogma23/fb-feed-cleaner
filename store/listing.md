@@ -25,7 +25,7 @@ nothing else.
 - Suggested groups can be hidden too.
 - The Sponsored column on the right, above your contacts, is hidden.
 
-Two options worth knowing about: Strict mode only hides posts that are also
+Two options worth knowing about: Cautious mode hides FEWER posts, not more — suggested posts and groups are only removed when they are also
 marked "Suggested for you", and a placeholder option leaves a small strip with
 a Show button instead of removing a post outright, so you can always see what
 was hidden and put it back.
@@ -86,20 +86,33 @@ Select: **does not collect or use user data.**
 - `store/promo-tile-440x280.png`
 - `store/marquee-1400x560.png`
 
-01 and 03 come from the same generator as the other Quite Apps listings
-(`tools/make-shots.py` in the website project), so the three extensions present
-as one publisher.
+All three screenshots and the marquee were regenerated on 2026-09-01 from
+`store/src/*.html`, which live in this repo — no external generator is needed
+any more. Each embeds a LIVE capture of the shipped 2.6.6 popup (see
+`store/src/` for the sources), so the panel is the real product rather than a
+mock, per the brand guide.
 
-02 was regenerated on 2026-08-30 and is NOT from that generator: it is an HTML
-render wrapping a live screenshot of the real 2.6.1 popup, so the panel in it is
-the actual product rather than a mock. It replaces `02-hidden-as-it-loads.png`,
-whose headline ("Hidden as it loads, not after.") and first bullet ("Posts never
-paint, so nothing flickers away") were a timing claim the code does not deliver
-— the harness records a newly arrived ad taking about 1.5s, with the post
-painting at full height first, and deliberately does not assert it because it is
-a known-unfixed defect. If 01 and 03 are ever regenerated, 02 will need
-re-rendering from `store/screenshot-02-source.html` (open it at exactly
-1280x800, device scale 1, and capture) to keep the set consistent.
+> Version note, 2026-09-02: the package is now **2.6.7**, while the store
+> art above was captured from 2.6.6. That number is left as it is because the
+> images genuinely show 2.6.6 and editing it would make this file lie about its
+> own evidence. Checked: no rendered version string is visible in any of the
+> images, so nothing on the store is stale — only re-capture if that changes.
+
+
+What was wrong with the set they replace, all of it live on the store:
+
+- `01` claimed "Sponsored posts hidden as the feed loads". The hiding is done by
+  `[data-fbfc-hidden="1"]`, an attribute JavaScript sets AFTER examining a post;
+  the harness records a new ad taking about 1.5s with the post painting at full
+  height first. Now reads "Sponsored posts taken out of your feed".
+- `02-hidden-as-it-loads.png` carried that same claim in its headline and first
+  bullet. It had been replaced once already, on 2026-08-30, and a regeneration
+  on the 31st recreated it. Deleted.
+- `03` said "Storage, to remember your six checkboxes". Storage also holds the
+  hide counters. Now reads "Storage, for your settings and what it has hidden".
+- All four images showed "Strict mode", renamed to "Cautious mode" in 2.6.5.
+- The marquee also stamped v2.6.3. The popup no longer renders a version when
+  opened outside a Facebook tab, so there is nothing left to go stale.
 
 The counters visible in 02 read 63 / 42 / 1, taken from a clean test profile on
 2026-08-30. The previous set showed 243 / 394 / 77, which were real reads but of

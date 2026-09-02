@@ -43,7 +43,7 @@ Click the extension icon. Changes apply immediately — no reload needed.
 | Hide suggested posts | on | Pages you don't follow, pushed into your feed |
 | Hide suggested groups | off | Groups you're not a member of |
 | Hide the Sponsored column | on | The ad panel on the right, above your contacts |
-| Strict mode | off | Makes the suggested-post filter fussier — only hides posts also marked "Suggested for you". Doesn't affect ads |
+| Cautious mode | off | Hides **fewer** posts, not more — suggested posts and groups are only removed when Facebook itself marks them "Suggested for you". Ads are unaffected |
 | Show a placeholder | off | Leaves a small strip with a **Show** button instead of removing the post, so you can see what was caught |
 | Status badge | off | Troubleshooting overlay on the feed |
 
@@ -55,7 +55,7 @@ suggested posts and groups — and has **Copy report**, **Show all** and
 
 Facebook shows a **Follow** button on *any* page post you don't already follow —
 including one a friend shared. Those get hidden too. If that's costing you
-things you wanted to see, turn on **Strict mode**: it then only removes posts
+things you wanted to see, turn on **Cautious mode**: it then only removes posts
 explicitly marked "Suggested for you". Fewer suggestions disappear, but nothing
 you actually follow will.
 
